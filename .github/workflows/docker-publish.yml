@@ -43,10 +43,8 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix={{branch}}-
-            type=ref,event=branch
-            type=ref,event=tag
+            type=raw,value=${{ matrix.platform }}-latest
+            type=sha,prefix=${{ matrix.platform }}-${{ github.ref_name }}-
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -60,4 +58,41 @@ jobs:
             type=gha,scope=${{ matrix.platform }}
           cache-to: |
             type=gha,mode=max,scope=${{ matrix.platform }}
-          target: runner  # 只构建到最终阶段
+          target: runner
+
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Create and push manifest
+        run: |
+          docker manifest create ${{ env.IMAGE_NAME }}:latest \
+            ${{ env.IMAGE_NAME }}:linux-amd64-latest \
+            ${{ env.IMAGE_NAME }}:linux-arm64-latest
+          
+          # 添加架构信息
+          docker manifest annotate ${{ env.IMAGE_NAME }}:latest \
+            ${{ env.IMAGE_NAME }}:linux-amd64-latest --os linux --arch amd64
+          docker manifest annotate ${{ env.IMAGE_NAME }}:latest \
+            ${{ env.IMAGE_NAME }}:linux-arm64-latest --os linux --arch arm64
+          
+          # 推送 manifest
+          docker manifest push ${{ env.IMAGE_NAME }}:latest
+
+          # 对 commit sha 标签也做同样的操作
+          docker manifest create ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ${{ env.IMAGE_NAME }}:linux-amd64-${{ github.ref_name }}-${{ github.sha }} \
+            ${{ env.IMAGE_NAME }}:linux-arm64-${{ github.ref_name }}-${{ github.sha }}
+          
+          docker manifest annotate ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ${{ env.IMAGE_NAME }}:linux-amd64-${{ github.ref_name }}-${{ github.sha }} --os linux --arch amd64
+          docker manifest annotate ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ${{ env.IMAGE_NAME }}:linux-arm64-${{ github.ref_name }}-${{ github.sha }} --os linux --arch arm64
+          
+          docker manifest push ${{ env.IMAGE_NAME }}:${{ github.sha }}
