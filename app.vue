@@ -1,4 +1,5 @@
 <template>
+  <NuxtPwaManifest />
   <UApp :locale="zh_cn">
     <NuxtLayout>
       <NuxtPage />
@@ -11,7 +12,7 @@
 
   // TODO
   useHead({
-    title: 'Deep Research Web UI',
+    title: 'Deep Research - Web UI',
     script: [
       // Anonymous analytics
       {

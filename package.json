@@ -22,6 +22,7 @@
     "@nuxt/ui": "3.0.0-alpha.12",
     "@nuxtjs/color-mode": "^3.5.2",
     "@nuxtjs/i18n": "9.2.0",
+	"@vite-pwa/nuxt": "^0.10.6",
     "@openrouter/ai-sdk-provider": "^0.2.1",
     "@pinia/nuxt": "^0.10.1",
     "@tailwindcss/typography": "^0.5.16",

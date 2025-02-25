@@ -1,5 +1,5 @@
 import { version as projVersion } from './public/version.json'
-
+const sw = process.env.SW === 'true'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
@@ -8,6 +8,7 @@ export default defineNuxtConfig({
     '@nuxtjs/color-mode',
     '@vueuse/nuxt',
     '@nuxtjs/i18n',
+	'@vite-pwa/nuxt',
   ],
 
   runtimeConfig: {
@@ -35,6 +36,38 @@ export default defineNuxtConfig({
     },
   },
 
+
+  pwa: {
+    strategies: sw ? 'injectManifest' : 'generateSW',
+    srcDir: sw ? 'service-worker' : undefined,
+    filename: sw ? 'sw.ts' : undefined,
+    registerType: 'autoUpdate',
+    manifest: {
+      name: 'Deep Research - Web UI',
+      short_name: 'Deep Research - Web UI',
+      theme_color: '#8e51ff',
+      icons: [
+        {
+          src: 'pwa-192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+        },
+        {
+          src: 'pwa-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+        },
+        {
+          src: 'pwa-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'any maskable',
+		},
+	  ],
+	},
+  },
+
+
   colorMode: {
     preference: 'system',
     dataValue: 'theme',
@@ -58,6 +91,14 @@ export default defineNuxtConfig({
 
   nitro: {
     compressPublicAssets: { brotli: true, gzip: true },
+  },
+  
+  app:{
+	  head:{
+		  link: [
+		  { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+		  ],
+	  },
   },
 
   css: ['~/assets/css/main.css'],
