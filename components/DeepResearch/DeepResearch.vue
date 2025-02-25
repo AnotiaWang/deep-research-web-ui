@@ -40,6 +40,7 @@
 
   const toast = useToast()
   const { t, locale } = useI18n()
+  const { config } = useConfigStore()
   const isLargeScreen = useMediaQuery('(min-width: 768px)')
 
   const flowRef = ref<InstanceType<typeof Flow>>()
@@ -278,6 +279,7 @@
         breadth,
         maxDepth: form.value.depth,
         languageCode: locale.value,
+        searchLanguageCode: config.webSearch.searchLanguage,
         learnings: existingLearnings,
         visitedUrls: existingVisitedUrls,
         onProgress: handleResearchProgress,
@@ -380,7 +382,7 @@
         <div
           v-if="selectedNode"
           :class="[
-            'border-gray-200',
+            'border-gray-100 dark:border-gray-800',
             isLargeScreen
               ? 'border-l w-1/3 pl-4 sm:pl-6'
               : 'h-1/2 overflow-y-scroll',

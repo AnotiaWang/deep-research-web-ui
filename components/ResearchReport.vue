@@ -1,7 +1,6 @@
 <script setup lang="ts">
   import { marked } from 'marked'
   import { writeFinalReport } from '~/lib/deep-research'
-  import jsPDF from 'jspdf'
   import {
     feedbackInjectionKey,
     formInjectionKey,
@@ -33,7 +32,8 @@
       loadingExportPdf.value ||
       loadingExportMarkdown.value,
   )
-  let pdf: jsPDF | undefined
+
+  let printJS: typeof import('print-js') | undefined
 
   async function generateReport() {
     loading.value = true
@@ -55,7 +55,7 @@
         } else if (chunk.type === 'text-delta') {
           reportContent.value += chunk.textDelta
         } else if (chunk.type === 'error') {
-          error.value = t('researchReport.error', [
+          error.value = t('researchReport.generateFailed', [
             chunk.error instanceof Error
               ? chunk.error.message
               : String(chunk.error),
@@ -67,102 +67,58 @@
       )}\n\n${visitedUrls.map((url) => `- ${url}`).join('\n')}`
     } catch (e: any) {
       console.error(`Generate report failed`, e)
-      error.value = t('researchReport.error', [e.message])
+      error.value = t('researchReport.generateFailed', [e.message])
     } finally {
       loading.value = false
     }
   }
 
   async function exportToPdf() {
-    const element = document.getElementById('report-content')
-    if (!element) return
-
-    loadingExportPdf.value = true
-
-    try {
-      // 创建 PDF 实例
-      if (!pdf) {
-        pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4',
-        })
-      }
-
-      // Load Chinese font
-      if (locale.value === 'zh') {
-        try {
-          if (!pdf.getFontList().SourceHanSans?.length) {
-            toast.add({
-              title: t('researchReport.downloadingFonts'),
-              duration: 5000,
-              color: 'info',
-            })
-            // Wait for 100ms to avoid toast being blocked by PDF generation
-            await new Promise((resolve) => setTimeout(resolve, 100))
-            const fontUrl = '/fonts/SourceHanSansCN-VF.ttf'
-            pdf.addFont(fontUrl, 'SourceHanSans', 'normal')
-            pdf.setFont('SourceHanSans')
-          }
-        } catch (e: any) {
-          toast.add({
-            title: t('researchReport.downloadFontFailed'),
-            description: e.message,
-            duration: 8000,
-            color: 'error',
-          })
-          console.warn(
-            'Failed to load Chinese font, fallback to default font:',
-            e,
-          )
-        }
-      }
-
-      // 设置字体大小和行高
-      const fontSize = 10.5
-      const lineHeight = 1.5
-      pdf.setFontSize(fontSize)
-
-      // 设置页面边距（单位：mm）
-      const margin = {
-        top: 20,
-        right: 20,
-        bottom: 20,
-        left: 20,
-      }
-
-      // 获取纯文本内容
-      const content = element.innerText
-
-      // 计算可用宽度（mm）
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const maxWidth = pageWidth - margin.left - margin.right
-
-      // 分割文本为行
-      const lines = pdf.splitTextToSize(content, maxWidth)
-
-      // 计算当前位置
-      let y = margin.top
-
-      // 逐行添加文本
-      for (const line of lines) {
-        // 检查是否需要新页
-        if (y > pdf.internal.pageSize.getHeight() - margin.bottom) {
-          pdf.addPage()
-          y = margin.top
-        }
-
-        // 添加文本
-        pdf.text(line, margin.left, y)
-        y += fontSize * lineHeight
-      }
-
-      pdf.save('research-report.pdf')
-    } catch (error) {
-      console.error('Export to PDF failed:', error)
-    } finally {
+    // Change the title back
+    const cleanup = () => {
+      useHead({
+        title: 'Deep Research Web UI',
+      })
       loadingExportPdf.value = false
     }
+    loadingExportPdf.value = true
+    // Temporarily change the document title, which will be used as the filename
+    useHead({
+      title: `Deep Research Report - ${form.value.query ?? 'Untitled'}`,
+    })
+    // Wait after title is changed
+    await new Promise((r) => setTimeout(r, 100))
+
+    if (!printJS) {
+      printJS = (await import('print-js')).default
+    }
+
+    printJS({
+      printable: reportHtml.value,
+      type: 'raw-html',
+      showModal: true,
+      onIncompatibleBrowser() {
+        toast.add({
+          title: t('researchReport.incompatibleBrowser'),
+          description: t('researchReport.incompatibleBrowserDescription'),
+          duration: 10_000,
+        })
+        cleanup()
+      },
+      onError(error, xmlHttpRequest) {
+        console.error(`[Export PDF] failed:`, error, xmlHttpRequest)
+        toast.add({
+          title: t('researchReport.exportFailed'),
+          description: error instanceof Error ? error.message : String(error),
+          duration: 10_000,
+        })
+        cleanup()
+      },
+      onPrintDialogClose() {
+        cleanup()
+      },
+    })
+    return
   }
 
   async function exportToMarkdown() {
@@ -210,7 +166,13 @@
       </div>
     </template>
 
-    <div v-if="error" class="text-red-500">{{ error }}</div>
+    <UAlert
+      v-if="error"
+      :title="$t('researchReport.exportFailed')"
+      :description="error"
+      color="error"
+      variant="soft"
+    />
 
     <div class="flex mb-4 justify-end">
       <UButton
@@ -246,7 +208,6 @@
 
     <div
       v-if="reportContent"
-      id="report-content"
       class="prose prose-sm max-w-none break-words p-6 bg-gray-50 dark:bg-gray-800 dark:prose-invert dark:text-white rounded-lg shadow"
       v-html="reportHtml"
     />

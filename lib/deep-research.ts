@@ -126,7 +126,7 @@ export function generateSearchQueries({
     system: systemPrompt(),
     prompt,
     onError({ error }) {
-      throw error
+      throwAiError('generateSearchQueries', error)
     },
   })
 }
@@ -174,7 +174,7 @@ function processSearchResult({
     system: systemPrompt(),
     prompt,
     onError({ error }) {
-      throw error
+      throwAiError('processSearchResult', error)
     },
   })
 }
@@ -204,7 +204,7 @@ export function writeFinalReport({
     system: systemPrompt(),
     prompt: _prompt,
     onError({ error }) {
-      throw error
+      throwAiError('writeFinalReport', error)
     },
   })
 }
@@ -218,6 +218,7 @@ export async function deepResearch({
   breadth,
   maxDepth,
   languageCode,
+  searchLanguageCode,
   learnings = [],
   visitedUrls = [],
   onProgress,
@@ -228,8 +229,10 @@ export async function deepResearch({
   query: string
   breadth: number
   maxDepth: number
-  /** Language code for SERP queries and web searches */
+  /** The language of generated response */
   languageCode: Locale
+  /** The language of SERP query */
+  searchLanguageCode?: Locale
   /** Accumulated learnings from all nodes visited so far */
   learnings?: string[]
   /** Accumulated visited URLs from all nodes visited so far */
@@ -243,6 +246,9 @@ export async function deepResearch({
 }): Promise<ResearchResult> {
   const { t } = useNuxtApp().$i18n
   const language = t('language', {}, { locale: languageCode })
+  const searchLanguage = searchLanguageCode
+    ? t('language', {}, { locale: searchLanguageCode })
+    : undefined
   const globalLimit = usePLimit()
 
   try {
@@ -266,7 +272,7 @@ export async function deepResearch({
         learnings,
         numQueries: breadth,
         language,
-        searchLanguage: language,
+        searchLanguage,
       })
 
       for await (const chunk of parseStreamingJson(

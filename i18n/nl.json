@@ -92,15 +92,16 @@
   },
   "researchReport": {
     "title": "4. Onderzoeksrapport",
-    "exportPdf": "PDF exporteren",
+    "exportPdf": "Afdrukken (PDF)",
     "exportMarkdown": "Markdown exporteren",
     "sources": "Bronnen",
     "waiting": "Wachten op het rapport...",
     "generating": "Rapport genereren...",
-    "error": "Rapport genereren mislukt: {0}",
-    "downloadingFonts": "Het downloaden van de benodigde lettertypen kan enige tijd duren...",
-    "downloadFontFailed": "Downloaden van lettertype mislukt",
-    "regenerate": "Regenereren"
+    "regenerate": "Regenereren",
+    "generateFailed": "Rapport genereren mislukt: {0}",
+    "exportFailed": "Export mislukt",
+    "incompatibleBrowser": "Niet-ondersteunde browser",
+    "incompatibleBrowserDescription": "Uw browser ondersteunt deze printmethode niet. Overweeg een moderne browser te gebruiken, of exporteer de Markdown en converteer deze handmatig naar PDF met behulp van andere diensten zoals https://md-to-pdf.fly.dev (Gebruik op eigen risico)"
   },
   "error": {
     "requestBlockedByCORS": "De huidige API-provider staat mogelijk geen cross-origin-verzoeken toe. Probeer een andere API-provider of neem contact op met de provider voor ondersteuning.."

@@ -19,6 +19,7 @@ export default defineNuxtConfig({
   routeRules: {
     '/version.json': {
       cors: true,
+      cache: false,
     },
   },
 

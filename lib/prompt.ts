@@ -24,7 +24,7 @@ export const languagePrompt = (language: string) => {
 
   if (language === '中文') {
     languagePrompt +=
-      ' Add appropriate spaces between Chinese and Latin characters / numbers to improve readability.'
+      ' Add appropriate spaces between Chinese characters and Latin characters/numbers (e.g., "使用Vue组件" -> "使用 Vue 组件", "深度为3" -> "深度为 3"), but do not add spaces between Chinese characters themselves.'
   }
   return languagePrompt
 }

@@ -37,8 +37,7 @@ export function generateFeedback({
     system: systemPrompt(),
     prompt,
     onError({ error }) {
-      console.error(`generateFeedback`, error)
-      throw error
+      throwAiError('generateFeedback', error)
     },
   })
 

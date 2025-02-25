@@ -22,7 +22,6 @@
       :description="node.error"
       color="error"
       variant="soft"
-      :duration="8000"
       :actions="[
         {
           label: $t('webBrowsing.retry'),

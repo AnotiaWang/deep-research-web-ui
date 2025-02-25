@@ -21,6 +21,19 @@
   /** If loading AI models failed, use a plain input to improve UX */
   const isLoadAiModelsFailed = ref(false)
 
+  const activeSections = ref(['0', '1'])
+  const settingSections = computed(() => [
+    {
+      label: t('settings.ai.provider'),
+      icon: 'i-lucide-bot',
+      slot: 'ai',
+    },
+    {
+      label: t('settings.webSearch.provider'),
+      icon: 'i-lucide-search',
+      slot: 'web-search',
+    },
+  ])
   const aiProviderOptions = computed(() => [
     {
       label: t('settings.ai.providers.openaiCompatible.title'),
@@ -170,183 +183,198 @@
       <UButton icon="i-lucide-settings" />
 
       <template #body>
-        <div class="flex flex-col gap-y-2">
+        <UAccordion
+          v-model="activeSections"
+          type="multiple"
+          :items="settingSections"
+          collapsible
+        >
           <!-- AI provider -->
-          <h3 class="font-bold">{{ $t('settings.ai.provider') }}</h3>
-          <UFormField>
-            <template v-if="selectedAiProvider?.help" #help>
-              <i18n-t
-                class="whitespace-pre-wrap"
-                :keypath="selectedAiProvider.help"
-                tag="span"
+          <template #ai>
+            <div class="flex flex-col gap-y-2 mb-2">
+              <UFormField>
+                <template v-if="selectedAiProvider?.help" #help>
+                  <i18n-t
+                    class="whitespace-pre-wrap"
+                    :keypath="selectedAiProvider.help"
+                    tag="span"
+                  >
+                    <UButton
+                      v-if="selectedAiProvider.link"
+                      class="!p-0"
+                      :to="selectedAiProvider.link"
+                      target="_blank"
+                      variant="link"
+                    >
+                      {{
+                        selectedAiProvider.linkText || selectedAiProvider.link
+                      }}
+                    </UButton>
+                  </i18n-t>
+                </template>
+                <USelect
+                  v-model="config.ai.provider"
+                  class="w-full"
+                  :items="aiProviderOptions"
+                />
+              </UFormField>
+              <UFormField
+                :label="$t('settings.ai.apiKey')"
+                :required="config.ai.provider !== 'ollama'"
               >
-                <UButton
-                  v-if="selectedAiProvider.link"
-                  class="!p-0"
-                  :to="selectedAiProvider.link"
-                  target="_blank"
-                  variant="link"
-                >
-                  {{ selectedAiProvider.linkText || selectedAiProvider.link }}
-                </UButton>
-              </i18n-t>
-            </template>
-            <USelect
-              v-model="config.ai.provider"
-              class="w-full"
-              :items="aiProviderOptions"
-            />
-          </UFormField>
-
-          <div class="flex flex-col gap-y-2">
-            <UFormField
-              :label="$t('settings.ai.apiKey')"
-              :required="config.ai.provider !== 'ollama'"
-            >
-              <PasswordInput
-                v-model="config.ai.apiKey"
-                class="w-full"
-                :placeholder="$t('settings.ai.apiKey')"
-              />
-            </UFormField>
-            <UFormField :label="$t('settings.ai.apiBase')">
-              <UInput
-                v-model="config.ai.apiBase"
-                class="w-full"
-                :placeholder="aiApiBase"
-              />
-            </UFormField>
-            <UFormField :label="$t('settings.ai.model')" required>
-              <UInputMenu
-                v-if="aiModelOptions.length && !isLoadAiModelsFailed"
-                v-model="config.ai.model"
-                class="w-full"
-                :items="aiModelOptions"
-                :placeholder="$t('settings.ai.model')"
-                :loading="loadingAiModels"
-                create-item
-                @create="createAndSelectAiModel"
-              />
-              <UInput
-                v-else
-                v-model="config.ai.model"
-                class="w-full"
-                :placeholder="$t('settings.ai.model')"
-              />
-            </UFormField>
-            <UFormField :label="$t('settings.ai.contextSize')">
-              <template #help>
-                {{ $t('settings.ai.contextSizeHelp') }}
-              </template>
-              <UInput
-                v-model="config.ai.contextSize"
-                class="w-26"
-                type="number"
-                placeholder="128000"
-                :min="512"
-              />
-              tokens
-            </UFormField>
-          </div>
-
-          <USeparator class="my-2" />
+                <PasswordInput
+                  v-model="config.ai.apiKey"
+                  class="w-full"
+                  :placeholder="$t('settings.ai.apiKey')"
+                />
+              </UFormField>
+              <UFormField :label="$t('settings.ai.apiBase')">
+                <UInput
+                  v-model="config.ai.apiBase"
+                  class="w-full"
+                  :placeholder="aiApiBase"
+                />
+              </UFormField>
+              <UFormField :label="$t('settings.ai.model')" required>
+                <UInputMenu
+                  v-if="aiModelOptions.length && !isLoadAiModelsFailed"
+                  v-model="config.ai.model"
+                  class="w-full"
+                  :items="aiModelOptions"
+                  :placeholder="$t('settings.ai.model')"
+                  :loading="loadingAiModels"
+                  create-item
+                  @create="createAndSelectAiModel"
+                />
+                <UInput
+                  v-else
+                  v-model="config.ai.model"
+                  class="w-full"
+                  :placeholder="$t('settings.ai.model')"
+                />
+              </UFormField>
+              <UFormField :label="$t('settings.ai.contextSize')">
+                <template #help>
+                  {{ $t('settings.ai.contextSizeHelp') }}
+                </template>
+                <UInput
+                  v-model="config.ai.contextSize"
+                  class="w-26"
+                  type="number"
+                  placeholder="128000"
+                  :min="512"
+                />
+                tokens
+              </UFormField>
+            </div>
+          </template>
 
           <!-- Web search -->
-          <h3 class="font-bold"> {{ $t('settings.webSearch.provider') }} </h3>
-          <UFormField>
-            <template #help>
-              <i18n-t
-                v-if="selectedWebSearchProvider?.help"
-                :keypath="selectedWebSearchProvider.help"
-                tag="p"
+          <template #web-search>
+            <div class="flex flex-col gap-y-2">
+              <UFormField>
+                <template #help>
+                  <i18n-t
+                    v-if="selectedWebSearchProvider?.help"
+                    :keypath="selectedWebSearchProvider.help"
+                    tag="p"
+                  >
+                    <UButton
+                      class="!p-0"
+                      :to="selectedWebSearchProvider.link"
+                      target="_blank"
+                      variant="link"
+                    >
+                      {{ selectedWebSearchProvider.link }}
+                    </UButton>
+                  </i18n-t>
+                </template>
+                <USelect
+                  v-model="config.webSearch.provider"
+                  class="w-30"
+                  :items="webSearchProviderOptions"
+                />
+              </UFormField>
+              <UFormField
+                :label="$t('settings.webSearch.apiKey')"
+                :required="!config.webSearch.apiBase"
               >
-                <UButton
-                  class="!p-0"
-                  :to="selectedWebSearchProvider.link"
-                  target="_blank"
-                  variant="link"
-                >
-                  {{ selectedWebSearchProvider.link }}
-                </UButton>
-              </i18n-t>
-            </template>
-            <USelect
-              v-model="config.webSearch.provider"
-              class="w-30"
-              :items="webSearchProviderOptions"
-            />
-          </UFormField>
-          <UFormField
-            :label="$t('settings.webSearch.apiKey')"
-            :required="!config.webSearch.apiBase"
-          >
-            <PasswordInput
-              v-model="config.webSearch.apiKey"
-              class="w-full"
-              :placeholder="$t('settings.webSearch.apiKey')"
-            />
-          </UFormField>
-          <UFormField
-            v-if="selectedWebSearchProvider?.supportsCustomApiBase"
-            :label="$t('settings.webSearch.apiBase')"
-          >
-            <UInput
-              v-model="config.webSearch.apiBase"
-              class="w-full"
-              :placeholder="webSearchApiBase"
-            />
-          </UFormField>
-          <UFormField :label="$t('settings.webSearch.queryLanguage')">
-            <template #help>
-              <i18n-t
-                class="whitespace-pre-wrap"
-                keypath="settings.webSearch.queryLanguageHelp"
-                tag="p"
-              />
-            </template>
-            <LangSwitcher
-              :value="config.webSearch.searchLanguage"
-              @update="config.webSearch.searchLanguage = $event"
-              private
-            />
-          </UFormField>
-          <UFormField :label="$t('settings.webSearch.concurrencyLimit')">
-            <template #help>
-              {{ $t('settings.webSearch.concurrencyLimitHelp') }}
-            </template>
-            <UInput
-              v-model="config.webSearch.concurrencyLimit"
-              class="w-15"
-              type="number"
-              placeholder="2"
-              :min="1"
-              :max="5"
-              :step="1"
-            />
-          </UFormField>
+                <PasswordInput
+                  v-model="config.webSearch.apiKey"
+                  class="w-full"
+                  :placeholder="$t('settings.webSearch.apiKey')"
+                />
+              </UFormField>
+              <UFormField
+                v-if="selectedWebSearchProvider?.supportsCustomApiBase"
+                :label="$t('settings.webSearch.apiBase')"
+              >
+                <UInput
+                  v-model="config.webSearch.apiBase"
+                  class="w-full"
+                  :placeholder="webSearchApiBase"
+                />
+              </UFormField>
+              <UFormField :label="$t('settings.webSearch.queryLanguage')">
+                <template #help>
+                  <i18n-t
+                    class="whitespace-pre-wrap"
+                    keypath="settings.webSearch.queryLanguageHelp"
+                    tag="p"
+                  />
+                </template>
+                <LangSwitcher
+                  :value="config.webSearch.searchLanguage"
+                  @update="config.webSearch.searchLanguage = $event"
+                  private
+                />
+              </UFormField>
+              <UFormField :label="$t('settings.webSearch.concurrencyLimit')">
+                <template #help>
+                  {{ $t('settings.webSearch.concurrencyLimitHelp') }}
+                </template>
+                <UInput
+                  v-model="config.webSearch.concurrencyLimit"
+                  class="w-15"
+                  type="number"
+                  placeholder="2"
+                  :min="1"
+                  :max="5"
+                  :step="1"
+                />
+              </UFormField>
 
-          <!-- Tavily-specific settings -->
-          <template v-if="config.webSearch.provider === 'tavily'">
-            <UFormField
-              :label="$t('settings.webSearch.providers.tavily.advancedSearch')"
-              :help="$t('settings.webSearch.providers.tavily.advancedSearchHelp')"
-            >
-              <USwitch v-model="config.webSearch.tavilyAdvancedSearch" />
-            </UFormField>
-            <UFormField
-              :label="$t('settings.webSearch.providers.tavily.searchTopic')"
-              :help="$t('settings.webSearch.providers.tavily.searchTopicHelp')"
-            >
-              <USelect
-                v-model="config.webSearch.tavilySearchTopic"
-                class="w-30"
-                :items="tavilySearchTopicOptions"
-                placeholder="general"
-              />
-            </UFormField>
+              <!-- Tavily-specific settings -->
+              <template v-if="config.webSearch.provider === 'tavily'">
+                <UFormField
+                  :label="
+                    $t('settings.webSearch.providers.tavily.advancedSearch')
+                  "
+                  :help="
+                    $t('settings.webSearch.providers.tavily.advancedSearchHelp')
+                  "
+                >
+                  <USwitch v-model="config.webSearch.tavilyAdvancedSearch" />
+                </UFormField>
+                <UFormField
+                  :label="$t('settings.webSearch.providers.tavily.searchTopic')"
+                  :help="
+                    $t('settings.webSearch.providers.tavily.searchTopicHelp')
+                  "
+                >
+                  <USelect
+                    v-model="config.webSearch.tavilySearchTopic"
+                    class="w-30"
+                    :items="tavilySearchTopicOptions"
+                    placeholder="general"
+                  />
+                </UFormField>
+              </template>
+            </div>
           </template>
-        </div>
+        </UAccordion>
       </template>
+
       <template #footer>
         <div class="flex items-center justify-between gap-2 w-full">
           <p class="text-sm text-gray-500">

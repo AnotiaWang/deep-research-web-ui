@@ -27,6 +27,8 @@ Please give a 🌟 Star if you like this project!
 25/02/24
 
 - Added: Fullscreen mode for the search flow. This helps you to focus on the search process better.
+- Changed: "Export PDF" now uses the browser's native print ability. This fixes layout issues and emilinates font problems.
+- Fixed: "Context Size" setting are not correctly applied
 
 25/02/22
 

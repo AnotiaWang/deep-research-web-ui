@@ -92,15 +92,16 @@
   },
   "researchReport": {
     "title": "4. 研究报告",
-    "exportPdf": "导出 PDF",
+    "exportPdf": "打印 (PDF)",
     "exportMarkdown": "导出 Markdown",
     "sources": "来源",
     "waiting": "等待报告...",
     "generating": "生成报告中...",
-    "error": "生成报告失败：{0}",
-    "downloadingFonts": "正在下载必要字体，可能需要较长时间...",
-    "downloadFontFailed": "下载字体失败",
-    "regenerate": "重新生成"
+    "regenerate": "重新生成",
+    "generateFailed": "生成报告失败：{0}",
+    "exportFailed": "导出失败",
+    "incompatibleBrowserDescription": "您的浏览器不支持这种打印方式，请考虑改用更现代的浏览器，或者导出 Markdown 并手动使用其他服务（如 https://md-to-pdf.fly.dev）将其转换为 PDF（不承诺安全性）。",
+    "incompatibleBrowser": "浏览器可能较旧"
   },
   "error": {
     "requestBlockedByCORS": "当前 API 服务可能不允许接口跨域，请换一个服务试试，或者向服务方反馈。"

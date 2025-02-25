@@ -21,7 +21,7 @@ RUN pnpm build:optimize
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 # 只复制必要的文件
 COPY --from=builder /app/.output .output

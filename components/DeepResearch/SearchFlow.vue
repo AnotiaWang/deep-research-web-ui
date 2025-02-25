@@ -103,7 +103,6 @@
   }
 
   function reset() {
-    console.warn('reset')
     layoutGraph()
     hasUserInteraction = false
   }

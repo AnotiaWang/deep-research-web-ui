@@ -54,7 +54,9 @@ export const useWebSearch = (): WebSearchFunction => {
       return async (q: string, o: WebSearchOptions) => {
         const results = await tvly.search(q, {
           ...o,
-          searchDepth: config.webSearch.tavilyAdvancedSearch ? 'advanced' : 'basic',
+          searchDepth: config.webSearch.tavilyAdvancedSearch
+            ? 'advanced'
+            : 'basic',
           topic: config.webSearch.tavilySearchTopic,
         })
         return results.results

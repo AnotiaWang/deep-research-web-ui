@@ -92,15 +92,16 @@
   },
   "researchReport": {
     "title": "4. Research Report",
-    "exportPdf": "Export PDF",
+    "exportPdf": "Print (PDF)",
     "exportMarkdown": "Export Markdown",
     "sources": "Sources",
     "waiting": "Waiting for report...",
     "generating": "Generating report...",
-    "error": "Generate report failed: {0}",
-    "downloadingFonts": "Downloading necessary fonts, this may take some time...",
-    "downloadFontFailed": "Download font failed",
-    "regenerate": "Regenerate"
+    "regenerate": "Regenerate",
+    "incompatibleBrowser": "Incompatibile browser",
+    "incompatibleBrowserDescription": "Your browser does not support this printing method. Please consider using a modern browser, or export the Markdown and manually convert it into PDF using other services, like https://md-to-pdf.fly.dev (Use at your own risk)",
+    "exportFailed": "Export failed",
+    "generateFailed": "Generate report failed: {0}"
   },
   "error": {
     "requestBlockedByCORS": "The current API provider may not allow cross-origin requests. Please try a different service provider or contact the provider for support."
