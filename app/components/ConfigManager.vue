@@ -92,11 +92,10 @@
       supportsCustomApiBase: true,
     },
     {
-      label: 'Google PSE', // Or use i18n: t('settings.webSearch.providers.google-pse.title')
+      label: 'Google PSE',
       value: 'google-pse',
-      help: 'settings.webSearch.providers.google-pse.help', // Add corresponding i18n key
+      help: 'settings.webSearch.providers.google-pse.help',
       link: 'https://programmablesearchengine.google.com/', // Link to Google PSE console
-      supportsCustomApiBase: false, // Google PSE usually doesn't support custom base URLs in the same way
     },
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']

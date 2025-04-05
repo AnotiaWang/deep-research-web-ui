@@ -61,11 +61,10 @@ export const useWebSearch = (): WebSearchFunction => {
           key: apiKey,
           cx: pseId,
           q: q,
-          num: o.maxResults?.toString() || '5', // Default to 5 results if not specified
-          // Add other params like 'lr' based on lang if needed: o.lang ? `lang_${o.lang}` : undefined
+          num: o.maxResults?.toString() || '5',
         });
         if (o.lang) {
-          searchParams.append('lr', `lang_${o.lang}`); // Adjust language parameter format as needed by PSE API
+          searchParams.append('lr', `lang_${o.lang}`);
         }
 
         const apiUrl = `https://www.googleapis.com/customsearch/v1?${searchParams.toString()}`;
