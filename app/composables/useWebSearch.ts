@@ -46,6 +46,51 @@ export const useWebSearch = (): WebSearchFunction => {
           }))
       }
     }
+    case 'google-pse': {
+      const apiKey = config.webSearch.apiKey
+      const pseId = config.webSearch.googlePseId
+
+      return async (q: string, o: WebSearchOptions) => {
+        if (!apiKey || !pseId) {
+          throw new Error('Google PSE API key or ID not set')
+        }
+
+        // Construct Google PSE API URL
+        // Ref: https://developers.google.com/custom-search/v1/using_rest
+        const searchParams = new URLSearchParams({
+          key: apiKey,
+          cx: pseId,
+          q: q,
+          num: o.maxResults?.toString() || '5', // Default to 5 results if not specified
+          // Add other params like 'lr' based on lang if needed: o.lang ? `lang_${o.lang}` : undefined
+        });
+        if (o.lang) {
+          searchParams.append('lr', `lang_${o.lang}`); // Adjust language parameter format as needed by PSE API
+        }
+
+        const apiUrl = `https://www.googleapis.com/customsearch/v1?${searchParams.toString()}`;
+
+        try {
+          const response = await $fetch<{ items?: Array<{ title: string; link: string; snippet: string }> }>(apiUrl, { method: 'GET' });
+
+          if (!response.items) {
+            return [];
+          }
+
+          // Map response to WebSearchResult format
+          return response.items.map((item) => ({
+            content: item.snippet, // Use snippet as content
+            url: item.link,
+            title: item.title,
+          }));
+        } catch (error: any) {
+          console.error('Google PSE search failed:', error);
+          // Attempt to parse Google API error format
+          const errorMessage = error?.data?.error?.message || error.message || 'Unknown error';
+          throw new Error(`Google PSE Error: ${errorMessage}`);
+        }
+      }
+    }
     case 'tavily':
     default: {
       const tvly = tavily({

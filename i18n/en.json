@@ -49,6 +49,14 @@
         },
         "firecrawl": {
           "help": "Get one API key at {0} if you are using the official service."
+        },
+        "google-pse": {
+          "title": "Google PSE",
+          "help": "Uses Google Programmable Search Engine. Requires an API Key and a PSE ID from Google Cloud Console / PSE Console. Find details at {0}.",
+          "apiKeyLabel": "Google API Key",
+          "apiKeyPlaceholder": "Enter your Google API Key",
+          "pseIdLabel": "Programmable Search Engine ID (cx)",
+          "pseIdPlaceholder": "Enter your PSE ID (cx value)"
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",
