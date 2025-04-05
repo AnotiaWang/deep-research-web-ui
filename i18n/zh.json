@@ -49,6 +49,14 @@
           "searchTopic": "搜索领域",
           "advancedSearch": "高质量搜索",
           "searchTopicHelp": "搜索特定领域的信息，获得更精确的结果。默认为“通用” (general)。"
+        },
+        "google-pse": {
+          "title": "Google PSE",
+          "help": "使用 Google 可编程搜索引擎。需要来自 Google Cloud Console / PSE Console 的 API 密钥和 PSE ID。在 {0} 查看详情。",
+          "apiKeyLabel": "Google API 密钥",
+          "apiKeyPlaceholder": "输入你的 Google API 密钥",
+          "pseIdLabel": "可编程搜索引擎 ID (cx)",
+          "pseIdPlaceholder": "输入你的 PSE ID (cx 值)"
         }
       },
       "concurrencyLimit": "并发数",

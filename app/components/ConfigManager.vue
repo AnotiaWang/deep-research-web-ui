@@ -91,6 +91,13 @@
       link: 'https://www.firecrawl.dev/app/api-keys',
       supportsCustomApiBase: true,
     },
+    {
+      label: 'Google PSE', // Or use i18n: t('settings.webSearch.providers.google-pse.title')
+      value: 'google-pse',
+      help: 'settings.webSearch.providers.google-pse.help', // Add corresponding i18n key
+      link: 'https://programmablesearchengine.google.com/', // Link to Google PSE console
+      supportsCustomApiBase: false, // Google PSE usually doesn't support custom base URLs in the same way
+    },
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
   const selectedAiProvider = computed(() =>
@@ -378,6 +385,14 @@
                     :items="tavilySearchTopicOptions"
                     placeholder="general"
                   />
+                </UFormField>
+              </template>
+              <template v-if="config.webSearch.provider === 'google-pse'">
+                <UFormField :label="$t('settings.webSearch.providers.google-pse.pseIdLabel')" required>
+                  <UInput
+                    v-model="config.webSearch.googlePseId"
+                    class="w-full"
+                    :placeholder="$t('settings.webSearch.providers.google-pse.pseIdPlaceholder')" />
                 </UFormField>
               </template>
             </div>

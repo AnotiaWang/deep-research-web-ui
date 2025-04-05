@@ -49,6 +49,14 @@
         },
         "firecrawl": {
           "help": "Ontvang een API-sleutel bij {0} als u de officiële service gebruikt."
+        },
+        "google-pse": {
+          "title": "Google PSE",
+          "help": "Gebruikt Google Programmable Search Engine. Vereist een API-sleutel en een PSE-ID van Google Cloud Console / PSE Console. Vind details op {0}.",
+          "apiKeyLabel": "Google API-sleutel",
+          "apiKeyPlaceholder": "Voer uw Google API-sleutel in",
+          "pseIdLabel": "Programmable Search Engine ID (cx)",
+          "pseIdPlaceholder": "Voer uw PSE ID (cx-waarde) in"
         }
       },
       "concurrencyLimitHelp": "Beperk de gelijktijdige zoektaken. Dit is handig om te voorkomen dat de zoekmachine overbelast raakt en verzoeken mislukken.",

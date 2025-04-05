@@ -9,7 +9,7 @@ export type ConfigAiProvider =
   | 'deepseek'
   | 'ollama'
 
-export type ConfigWebSearchProvider = 'tavily' | 'firecrawl'
+export type ConfigWebSearchProvider = 'tavily' | 'firecrawl' | 'google-pse'
 
 export interface ConfigAi {
   provider: ConfigAiProvider
@@ -31,6 +31,7 @@ export interface ConfigWebSearch {
   tavilyAdvancedSearch?: boolean
   /** Tavily: search topic. Defaults to `general` */
   tavilySearchTopic?: 'general' | 'news' | 'finance'
+  googlePseId?: string; // Google PSE ID
 }
 
 export interface Config {
@@ -47,6 +48,7 @@ function validateConfig(config: Config) {
   if (ws.provider === 'tavily' && !ws.apiKey) return false
   // Either apiBase or apiKey is required for firecrawl
   if (ws.provider === 'firecrawl' && !ws.apiBase && !ws.apiKey) return false
+  if (ws.provider === 'google-pse' && (!ws.apiKey || !ws.googlePseId)) return false; // Require API Key and PSE ID
   if (typeof ws.concurrencyLimit !== 'undefined' && ws.concurrencyLimit! < 1)
     return false
   return true
