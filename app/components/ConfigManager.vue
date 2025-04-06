@@ -321,6 +321,26 @@
                   :placeholder="$t('settings.webSearch.apiKey')"
                 />
               </UFormField>
+
+              <template v-if="config.webSearch.provider === 'google-pse'">
+                <UFormField
+                  :label="
+                    $t('settings.webSearch.providers.google-pse.pseIdLabel')
+                  "
+                  required
+                >
+                  <UInput
+                    v-model="config.webSearch.googlePseId"
+                    class="w-full"
+                    :placeholder="
+                      $t(
+                        'settings.webSearch.providers.google-pse.pseIdPlaceholder',
+                      )
+                    "
+                  />
+                </UFormField>
+              </template>
+
               <UFormField
                 v-if="selectedWebSearchProvider?.supportsCustomApiBase"
                 :label="$t('settings.webSearch.apiBase')"
@@ -384,14 +404,6 @@
                     :items="tavilySearchTopicOptions"
                     placeholder="general"
                   />
-                </UFormField>
-              </template>
-              <template v-if="config.webSearch.provider === 'google-pse'">
-                <UFormField :label="$t('settings.webSearch.providers.google-pse.pseIdLabel')" required>
-                  <UInput
-                    v-model="config.webSearch.googlePseId"
-                    class="w-full"
-                    :placeholder="$t('settings.webSearch.providers.google-pse.pseIdPlaceholder')" />
                 </UFormField>
               </template>
             </div>
