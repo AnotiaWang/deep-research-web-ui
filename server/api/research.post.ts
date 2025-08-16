@@ -3,6 +3,52 @@ import pLimit from 'p-limit'
 import type { ConfigAi, ConfigWebSearch } from '~~/shared/types/config'
 import { RuntimeConfig } from 'nuxt/schema'
 
+class ApiKeyPool {
+    private state: { currentIndex: number; keys: { key: string; active: boolean; errorCount: number; maxErrors: number }[] };
+
+    constructor(keys: string[]) {
+        this.state = {
+            currentIndex: 0,
+            keys: keys.map(key => ({
+                key,
+                active: true,
+                errorCount: 0,
+                maxErrors: 5
+            }))
+        };
+    }
+
+    getNextKey() {
+        const activeKeys = this.state.keys.filter(k => k.active);
+        if (activeKeys.length === 0) {
+            return null;
+        }
+        const keyConfig = activeKeys[this.state.currentIndex % activeKeys.length];
+        this.state.currentIndex = (this.state.currentIndex + 1) % activeKeys.length;
+        return keyConfig;
+    }
+
+    markKeyError(key: string) {
+        const keyConfig = this.state.keys.find(k => k.key === key);
+        if (keyConfig) {
+            keyConfig.errorCount++;
+            if (keyConfig.errorCount >= keyConfig.maxErrors) {
+                keyConfig.active = false;
+                console.error(`[ApiKeyPool] Disabling key due to multiple errors: ${key.substring(0, 8)}...`);
+            }
+        }
+    }
+
+    markKeySuccess(key: string) {
+        const keyConfig = this.state.keys.find(k => k.key === key);
+        if (keyConfig) {
+            keyConfig.errorCount = 0;
+        }
+    }
+}
+
+let apiKeyPool: ApiKeyPool | undefined;
+
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
   const body = await readBody(event)
@@ -151,21 +197,45 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
       
       case 'tavily':
       default: {
-        const tvly = tavily({
-          apiKey,
-        })
-        const results = await tvly.search(query, {
-          maxResults: options.maxResults || 5,
-          searchDepth: runtimeConfig.public.tavilyAdvancedSearch ? 'advanced' : 'basic',
-          topic: runtimeConfig.public.tavilySearchTopic as ConfigWebSearch['tavilySearchTopic'],
-        })
-        return results.results
-          .filter((x: any) => !!x?.content && !!x.url)
-          .map((r: any) => ({
-            content: r.content,
-            url: r.url,
-            title: r.title,
-          }))
+        if (!apiKeyPool) {
+            const apiKeysEnv = runtimeConfig.webSearchApiKey;
+            if (!apiKeysEnv) {
+                throw new Error("NUXT_WEB_SEARCH_API_KEY environment variable not set.");
+            }
+            const keys = apiKeysEnv.split(',').map((key: string) => key.trim()).filter((key: string) => key);
+            if (keys.length === 0) {
+                throw new Error("NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.");
+            }
+            apiKeyPool = new ApiKeyPool(keys);
+        }
+
+        const selectedKeyConfig = apiKeyPool.getNextKey();
+        if (!selectedKeyConfig) {
+            throw new Error("No active Tavily API keys available.");
+        }
+        const currentApiKey = selectedKeyConfig.key;
+
+        try {
+            const tvly = tavily({
+              apiKey: currentApiKey,
+            })
+            const results = await tvly.search(query, {
+              maxResults: options.maxResults || 5,
+              searchDepth: runtimeConfig.public.tavilyAdvancedSearch ? 'advanced' : 'basic',
+              topic: runtimeConfig.public.tavilySearchTopic as ConfigWebSearch['tavilySearchTopic'],
+            })
+            apiKeyPool.markKeySuccess(currentApiKey);
+            return results.results
+              .filter((x: any) => !!x?.content && !!x.url)
+              .map((r: any) => ({
+                content: r.content,
+                url: r.url,
+                title: r.title,
+              }))
+        } catch (e) {
+            apiKeyPool.markKeyError(currentApiKey);
+            throw e;
+        }
       }
     }
   }
