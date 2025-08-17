@@ -2,52 +2,116 @@ import { deepResearch } from '~~/lib/core/deep-research'
 import pLimit from 'p-limit'
 import type { ConfigAi, ConfigWebSearch } from '~~/shared/types/config'
 import { RuntimeConfig } from 'nuxt/schema'
+import fs from 'node:fs'
+import path from 'node:path'
+
+// --- ApiKeyPool with File-based State Persistence ---
+
+interface ApiKeyConfig {
+  key: string
+  active: boolean
+  errorCount: number
+  maxErrors: number
+}
+
+interface ApiPoolState {
+  currentIndex: number
+  keys: ApiKeyConfig[]
+}
 
 class ApiKeyPool {
-    private state: { currentIndex: number; keys: { key: string; active: boolean; errorCount: number; maxErrors: number }[] };
+  private state: ApiPoolState
+  private readonly cacheFilePath: string
+  private readonly initialKeys: string[]
 
-    constructor(keys: string[]) {
-        this.state = {
-            currentIndex: 0,
-            keys: keys.map(key => ({
-                key,
-                active: true,
-                errorCount: 0,
-                maxErrors: 5
-            }))
-        };
+  constructor(keys: string[], providerName: string) {
+    this.initialKeys = keys
+    const cacheDir = path.join(process.cwd(), '.cache')
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true })
     }
+    this.cacheFilePath = path.join(cacheDir, `keypool_${providerName}.json`)
 
-    getNextKey() {
-        const activeKeys = this.state.keys.filter(k => k.active);
-        if (activeKeys.length === 0) {
-            return null;
-        }
-        const keyConfig = activeKeys[this.state.currentIndex % activeKeys.length];
-        this.state.currentIndex = (this.state.currentIndex + 1) % activeKeys.length;
-        return keyConfig;
-    }
+    this.state = this.loadState()
 
-    markKeyError(key: string) {
-        const keyConfig = this.state.keys.find(k => k.key === key);
-        if (keyConfig) {
-            keyConfig.errorCount++;
-            if (keyConfig.errorCount >= keyConfig.maxErrors) {
-                keyConfig.active = false;
-                console.error(`[ApiKeyPool] Disabling key due to multiple errors: ${key.substring(0, 8)}...`);
-            }
-        }
-    }
+    const envKeySet = new Set(keys)
+    const stateKeySet = new Set(this.state.keys.map(k => k.key))
 
-    markKeySuccess(key: string) {
-        const keyConfig = this.state.keys.find(k => k.key === key);
-        if (keyConfig) {
-            keyConfig.errorCount = 0;
-        }
+    if (this.state.keys.length !== keys.length || ![...envKeySet].every(k => stateKeySet.has(k))) {
+      this.state = {
+        currentIndex: 0,
+        keys: keys.map(key => ({
+          key,
+          active: true,
+          errorCount: 0,
+          maxErrors: 5,
+        })),
+      }
+      this.saveState()
     }
+  }
+
+  private loadState(): ApiPoolState {
+    try {
+      if (fs.existsSync(this.cacheFilePath)) {
+        const data = fs.readFileSync(this.cacheFilePath, 'utf8')
+        return JSON.parse(data)
+      }
+    }
+    catch (error: any) {
+      console.error(`[ApiKeyPool] Warning: Could not read cache file for ${this.cacheFilePath}. Starting fresh.`, error.message)
+    }
+    return { currentIndex: 0, keys: [] }
+  }
+
+  private saveState() {
+    try {
+      fs.writeFileSync(this.cacheFilePath, JSON.stringify(this.state, null, 2))
+    }
+    catch (error: any) {
+      console.error(`[ApiKeyPool] Error: Could not write to cache file for ${this.cacheFilePath}.`, error.message)
+    }
+  }
+
+  getNextKey(): ApiKeyConfig | null {
+    const activeKeys = this.state.keys.filter(k => k.active)
+    if (activeKeys.length === 0) {
+      return null
+    }
+    if (this.state.currentIndex >= activeKeys.length) {
+        this.state.currentIndex = 0
+    }
+    const keyConfig = activeKeys[this.state.currentIndex]
+    this.state.currentIndex = (this.state.currentIndex + 1) % activeKeys.length
+    this.saveState()
+    return keyConfig
+  }
+
+  markKeyError(key: string) {
+    const keyConfig = this.state.keys.find(k => k.key === key)
+    if (keyConfig) {
+      keyConfig.errorCount++
+      if (keyConfig.errorCount >= keyConfig.maxErrors) {
+        keyConfig.active = false
+        console.error(`[ApiKeyPool] Disabling key due to multiple errors: ${key.substring(0, 8)}...`)
+      }
+      this.saveState()
+    }
+  }
+
+  markKeySuccess(key: string) {
+    const keyConfig = this.state.keys.find(k => k.key === key)
+    if (keyConfig) {
+      if (keyConfig.errorCount > 0) {
+        keyConfig.errorCount = 0
+        this.saveState()
+      }
+    }
+  }
 }
 
 let apiKeyPool: ApiKeyPool | undefined;
+let googleApiKeyPool: ApiKeyPool | undefined;
 
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
@@ -166,33 +230,58 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
       }
       
       case 'google-pse': {
-        const pseId = runtimeConfig.public.googlePseId
-        if (!apiKey || !pseId) {
-          throw new Error('Google PSE API key or ID not set')
+        const pseId = runtimeConfig.public.googlePseId;
+        if (!pseId) {
+          throw new Error('NUXT_PUBLIC_GOOGLE_PSE_ID environment variable not set.');
         }
 
-        const searchParams = new URLSearchParams({
-          key: apiKey,
-          cx: pseId,
-          q: query,
-          num: (options.maxResults || 5).toString(),
-        })
-        if (options.lang) {
-          searchParams.append('lr', `lang_${options.lang}`)
+        if (!googleApiKeyPool) {
+            const apiKeysEnv = runtimeConfig.webSearchApiKey;
+            if (!apiKeysEnv) {
+                throw new Error("NUXT_WEB_SEARCH_API_KEY environment variable not set for Google PSE.");
+            }
+            const keys = apiKeysEnv.split(',').map((key: string) => key.trim()).filter((key: string) => key);
+            if (keys.length === 0) {
+                throw new Error("NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.");
+            }
+            googleApiKeyPool = new ApiKeyPool(keys, 'google-pse');
         }
 
-        const apiUrl = `https://www.googleapis.com/customsearch/v1?${searchParams.toString()}`
-        const response = await $fetch(apiUrl, { method: 'GET' }) as any
-
-        if (!response.items) {
-          return []
+        const selectedKeyConfig = googleApiKeyPool.getNextKey();
+        if (!selectedKeyConfig) {
+            throw new Error("No active Google PSE API keys available.");
         }
+        const currentApiKey = selectedKeyConfig.key;
 
-        return response.items.map((item: any) => ({
-          content: item.snippet,
-          url: item.link,
-          title: item.title,
-        }))
+        try {
+            const searchParams = new URLSearchParams({
+              key: currentApiKey,
+              cx: pseId,
+              q: query,
+              num: (options.maxResults || 5).toString(),
+            });
+            if (options.lang) {
+              searchParams.append('lr', `lang_${options.lang}`);
+            }
+
+            const apiUrl = `https://www.googleapis.com/customsearch/v1?${searchParams.toString()}`;
+            const response = await $fetch(apiUrl, { method: 'GET' }) as any;
+
+            if (!response.items) {
+              googleApiKeyPool.markKeySuccess(currentApiKey);
+              return [];
+            }
+            
+            googleApiKeyPool.markKeySuccess(currentApiKey);
+            return response.items.map((item: any) => ({
+              content: item.snippet,
+              url: item.link,
+              title: item.title,
+            }));
+        } catch (e) {
+            googleApiKeyPool.markKeyError(currentApiKey);
+            throw e;
+        }
       }
       
       case 'tavily':
@@ -206,7 +295,7 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
             if (keys.length === 0) {
                 throw new Error("NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.");
             }
-            apiKeyPool = new ApiKeyPool(keys);
+            apiKeyPool = new ApiKeyPool(keys, 'tavily');
         }
 
         const selectedKeyConfig = apiKeyPool.getNextKey();
