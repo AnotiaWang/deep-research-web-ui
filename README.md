@@ -18,6 +18,7 @@ Currently available providers:
 
 - AI: OpenAI compatible, SiliconFlow, Infiniai, DeepSeek, OpenRouter, Ollama and more
 - Web Search: Tavily (1000 free credits / month), Firecrawl (cloud / self-hosted)
+- Browser Automation: [Anchor Browser](https://anchorbrowser.io) - Agentic browser infrastructure platform for AI agents and browser automation
 
 Please give a 🌟 Star if you like this project!
 
@@ -228,21 +229,4 @@ pnpm build
 If you want to deploy a static, SSG application:
 
 ```bash
-pnpm generate
-```
-
-Locally preview production build:
-
-```bash
-pnpm preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-## License
-
-MIT
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=AnotiaWang/deep-research-web-ui&type=Date)](https://star-history.com/#AnotiaWang/deep-research-web-ui&Date)
+pnpm gener
