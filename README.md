@@ -246,3 +246,70 @@ MIT
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=AnotiaWang/deep-research-web-ui&type=Date)](https://star-history.com/#AnotiaWang/deep-research-web-ui&Date)
+
+
+## FAQ
+
+### Q: How do I set up the server mode?
+
+A: Server mode allows you to deploy the application with environment variables, so users don't need to configure API keys. Set the following environment variables:
+
+```bash
+export OPENAI_API_KEY=your_api_key
+export TAVILY_API_KEY=your_tavily_key
+```
+
+Then start the application. Users will not need to enter API keys in the UI.
+
+### Q: Which LLM providers are supported?
+
+A: The application supports multiple providers:
+- OpenAI compatible APIs
+- SiliconFlow
+- Infiniai
+- DeepSeek
+- OpenRouter
+- Ollama (for local models)
+- 302.AI
+
+Configure your preferred provider in the settings page.
+
+### Q: How do I use Docker to deploy?
+
+A: Use the provided Docker configuration:
+
+```bash
+docker run -p 3000:3000 -e OPENAI_API_KEY=your_key anotiawang/deep-research-web-ui
+```
+
+### Q: Can I use this with local models via Ollama?
+
+A: Yes! Select Ollama as your provider and configure the endpoint to your local Ollama instance (default: `http://localhost:11434`).
+
+### Q: How does the web search work?
+
+A: The application supports two web search providers:
+- **Tavily**: 1000 free credits/month, recommended for most users
+- **Firecrawl**: Cloud or self-hosted option
+
+Configure your preferred provider in the settings.
+
+### Q: Why is my research report empty or incomplete?
+
+A: Common causes:
+1. Invalid API key - verify your LLM provider API key
+2. Rate limits - check if you've exceeded your provider's rate limits
+3. Context size - ensure your model's context window is large enough
+4. Web search failure - verify your search provider API key and credits
+
+### Q: Can I export the research report as PDF?
+
+A: Yes! Click the "Export PDF" button to save the report. The application uses your browser's native print functionality for better layout and font support.
+
+### Q: How do I manage research history?
+
+A: The application includes research history management. You can:
+- View past research sessions
+- Export/import individual history records
+- Delete all records
+- Regenerate reports from previous searches
