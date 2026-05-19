@@ -21,18 +21,6 @@ Currently available providers:
 
 Please give a 🌟 Star if you like this project!
 
-## Sponsor
-
-<a href="https://www.swiftproxy.net/?ref=anotiawang">
-<img width="415" alt="image" src="https://github.com/user-attachments/assets/df889a5f-c4fc-4209-b49d-9c7dc8b9c3ca" />
-</a>
-
-**Unlock Reliable Proxy Services with Swiftproxy**
-
-With Swiftproxy, you can access high-performance, secure proxies to enhance your web automation, privacy, and data collection efforts. Our services are trusted by developers and businesses to scale scraping tasks and ensure a safe online experience. Get started today at Swiftproxy.net. Use the coupon `GHB5` to get 10% off!
-
----
-
 <video width="500" src="https://github.com/user-attachments/assets/8f9baa43-a74e-4613-aebb-1bcc29a686f0" controls></video>
 
 ## Recent updates
