@@ -7,7 +7,7 @@ export type ConfigAiProvider =
   | 'deepseek'
   | 'ollama'
 
-export type ConfigWebSearchProvider = 'tavily' | 'firecrawl' | 'google-pse'
+export type ConfigWebSearchProvider = 'tavily' | 'firecrawl' | 'crw' | 'google-pse'
 
 export interface ConfigAi {
   provider: ConfigAiProvider

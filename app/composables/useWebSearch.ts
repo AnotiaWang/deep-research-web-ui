@@ -13,7 +13,10 @@ export const useWebSearch = (): WebSearchFunction => {
   const { config, webSearchApiBase } = useConfigStore()
 
   switch (config.webSearch.provider) {
-    case 'firecrawl': {
+    case 'firecrawl':
+    // fastCRW is a Firecrawl-compatible web scraper (single binary; self-host or cloud).
+    // It uses the same client; only the base URL differs (see webSearchApiBase).
+    case 'crw': {
       const fc = new Firecrawl({
         apiKey: config.webSearch.apiKey,
         apiUrl: webSearchApiBase,

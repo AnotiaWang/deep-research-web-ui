@@ -17,7 +17,7 @@ Features:
 Currently available providers:
 
 - AI: OpenAI compatible, SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Ollama and more
-- Web Search: Tavily (1000 free credits / month), Firecrawl (cloud / self-hosted), Google PSE
+- Web Search: Tavily (1000 free credits / month), Firecrawl (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE
 
 Please give a 🌟 Star if you like this project!
 
@@ -215,13 +215,14 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | Type | Supported values |
 |------|------------------|
 | AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `deepseek`, `ollama` |
-| Web search provider | `tavily`, `firecrawl`, `google-pse` |
+| Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse` |
 
 Notes:
 
 - `NUXT_WEB_SEARCH_API_KEY` supports comma-separated keys for Tavily and Google PSE, for example `key1,key2,key3`.
 - Google PSE requires both `NUXT_WEB_SEARCH_API_KEY` and `NUXT_PUBLIC_GOOGLE_PSE_ID`.
 - Firecrawl self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
+- fastCRW (`crw`) is a Firecrawl-compatible web scraper (single binary; self-host or cloud). It defaults to the cloud base `https://fastcrw.com/api` and reads the key from `NUXT_WEB_SEARCH_API_KEY` (document as `CRW_API_KEY`); self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
 - Ollama uses `http://localhost:11434/v1` as the default API base. When running the app inside Docker, `localhost` refers to the container itself, so set `NUXT_AI_API_BASE` to a reachable host or Docker network address if Ollama runs outside the container.
 
 ---

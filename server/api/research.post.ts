@@ -230,6 +230,31 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
           }))
       }
 
+      case 'crw': {
+        // fastCRW is a Firecrawl-compatible web scraper (single binary; self-host or cloud).
+        // Reuse the Firecrawl client pointed at the fastCRW base URL.
+        const fc = new Firecrawl({
+          apiKey,
+          apiUrl: apiBase || 'https://fastcrw.com/api',
+        })
+        const results = await fc.search(query, {
+          maxResults: options.maxResults || 5,
+          scrapeOptions: {
+            formats: ['markdown'],
+          },
+        })
+        if (results.error) {
+          throw new Error(results.error)
+        }
+        return results.data
+          .filter((x: any) => !!x?.markdown && !!x.url)
+          .map((r: any) => ({
+            content: r.markdown!,
+            url: r.url!,
+            title: r.title,
+          }))
+      }
+
       case 'google-pse': {
         const pseId = runtimeConfig.public.googlePseId
         if (!pseId) {

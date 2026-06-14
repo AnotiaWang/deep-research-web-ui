@@ -11,6 +11,8 @@ function validateConfig(config: Config) {
   if (ws.provider === 'tavily' && !ws.apiKey) return false
   // Either apiBase or apiKey is required for firecrawl
   if (ws.provider === 'firecrawl' && !ws.apiBase && !ws.apiKey) return false
+  // Either apiBase (self-host) or apiKey (cloud) is required for crw
+  if (ws.provider === 'crw' && !ws.apiBase && !ws.apiKey) return false
   if (ws.provider === 'google-pse' && (!ws.apiKey || !ws.googlePseId)) return false // Require API Key and PSE ID
   if (typeof ws.concurrencyLimit !== 'undefined' && ws.concurrencyLimit! < 1) return false
   return true
@@ -93,6 +95,9 @@ export const useConfigStore = defineStore('config', () => {
     }
     if (webSearch.provider === 'firecrawl') {
       return webSearch.apiBase || 'https://api.firecrawl.dev'
+    }
+    if (webSearch.provider === 'crw') {
+      return webSearch.apiBase || 'https://fastcrw.com/api'
     }
   })
 

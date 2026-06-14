@@ -98,6 +98,15 @@
       supportsCustomApiBase: true,
     },
     {
+      label: 'fastCRW',
+      value: 'crw',
+      help: 'settings.webSearch.providers.crw.help',
+      // Only kept for easy reference in i18n Ally
+      _help: t('settings.webSearch.providers.crw.help'),
+      link: 'https://fastcrw.com',
+      supportsCustomApiBase: true,
+    },
+    {
       label: 'Google PSE',
       value: 'google-pse',
       help: 'settings.webSearch.providers.google-pse.help',

@@ -50,6 +50,9 @@
         "firecrawl": {
           "help": "Ontvang een API-sleutel bij {0} als u de officiële service gebruikt."
         },
+        "crw": {
+          "help": "Firecrawl-compatibele webscraper (één binary; self-host of cloud). Ontvang een API-sleutel bij {0} als u de clouddienst gebruikt, of stel de API-basis-URL in op uw zelf-gehoste server."
+        },
         "google-pse": {
           "title": "Google PSE",
           "help": "Gebruikt Google Programmable Search Engine. Vereist een API-sleutel en een PSE-ID van Google Cloud Console / PSE Console. Vind details op {0}.",

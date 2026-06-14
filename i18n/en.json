@@ -54,6 +54,9 @@
         "firecrawl": {
           "help": "Get one API key at {0} if you are using the official service."
         },
+        "crw": {
+          "help": "Firecrawl-compatible web scraper (single binary; self-host or cloud). Get one API key at {0} if you are using the cloud service, or set the API base URL to your self-hosted server."
+        },
         "google-pse": {
           "title": "Google PSE",
           "help": "Uses Google Programmable Search Engine. Requires an API Key and a PSE ID from Google Cloud Console / PSE Console. Find details at {0}.",
