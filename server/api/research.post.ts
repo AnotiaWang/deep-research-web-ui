@@ -212,21 +212,20 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
           apiKey,
           apiUrl: apiBase || 'https://api.firecrawl.dev',
         })
+        // v2 SDK: `search` throws on error and returns results grouped by
+        // source (`web`/`news`/`images`); `maxResults` was renamed to `limit`.
         const results = await fc.search(query, {
-          maxResults: options.maxResults || 5,
+          limit: options.maxResults || 5,
           scrapeOptions: {
             formats: ['markdown'],
           },
         })
-        if (results.error) {
-          throw new Error(results.error)
-        }
-        return results.data
-          .filter((x: any) => !!x?.markdown && !!x.url)
+        return (results.web ?? [])
+          .filter((x: any) => !!x?.markdown && !!(x.url ?? x.metadata?.sourceURL))
           .map((r: any) => ({
             content: r.markdown!,
-            url: r.url!,
-            title: r.title,
+            url: (r.url ?? r.metadata?.sourceURL)!,
+            title: r.title ?? r.metadata?.title,
           }))
       }
 
@@ -238,20 +237,17 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
           apiUrl: apiBase || 'https://fastcrw.com/api',
         })
         const results = await fc.search(query, {
-          maxResults: options.maxResults || 5,
+          limit: options.maxResults || 5,
           scrapeOptions: {
             formats: ['markdown'],
           },
         })
-        if (results.error) {
-          throw new Error(results.error)
-        }
-        return results.data
-          .filter((x: any) => !!x?.markdown && !!x.url)
+        return (results.web ?? [])
+          .filter((x: any) => !!x?.markdown && !!(x.url ?? x.metadata?.sourceURL))
           .map((r: any) => ({
             content: r.markdown!,
-            url: r.url!,
-            title: r.title,
+            url: (r.url ?? r.metadata?.sourceURL)!,
+            title: r.title ?? r.metadata?.title,
           }))
       }
 

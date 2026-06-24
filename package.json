@@ -20,7 +20,7 @@
     "@ai-sdk/vue": "^1.1.23",
     "@dagrejs/dagre": "^1.1.4",
     "@iconify-json/lucide": "^1.2.31",
-    "@mendable/firecrawl-js": "^1.20.1",
+    "@mendable/firecrawl-js": "^4.28.2",
     "@nuxt/ui": "3.3.0",
     "@nuxtjs/color-mode": "^3.5.2",
     "@nuxtjs/i18n": "10.0.3",

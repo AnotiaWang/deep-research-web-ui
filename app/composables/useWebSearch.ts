@@ -1,5 +1,5 @@
 import { tavily } from '@tavily/core'
-import Firecrawl from '@mendable/firecrawl-js'
+import Firecrawl, { type Document, type SearchResultWeb } from '@mendable/firecrawl-js'
 
 type WebSearchOptions = {
   maxResults?: number
@@ -22,21 +22,24 @@ export const useWebSearch = (): WebSearchFunction => {
         apiUrl: webSearchApiBase,
       })
       return async (q: string, o: WebSearchOptions) => {
+        // v2 SDK: `search` throws on error and returns results grouped by
+        // source (`web`/`news`/`images`) instead of the old flat `data` array.
+        // `maxResults` was renamed to `limit`.
         const results = await fc.search(q, {
-          ...o,
+          limit: o.maxResults,
           scrapeOptions: {
-            formats: ['markdown'], // TODO: verify if this actually works
+            formats: ['markdown'],
           },
         })
-        if (results.error) {
-          throw new Error(results.error)
-        }
-        return results.data
-          .filter((x) => !!x?.markdown && !!x.url)
+        // With `scrapeOptions`, web results are scraped `Document`s carrying
+        // `markdown` plus top-level `url`/`title` (and a `metadata` fallback).
+        return (results.web ?? [])
+          .map((r) => r as Document & SearchResultWeb)
+          .filter((r) => !!r.markdown && !!(r.url ?? r.metadata?.sourceURL))
           .map((r) => ({
             content: r.markdown!,
-            url: r.url!,
-            title: r.title,
+            url: (r.url ?? r.metadata?.sourceURL)!,
+            title: r.title ?? r.metadata?.title,
           }))
       }
     }

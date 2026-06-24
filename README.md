@@ -17,7 +17,7 @@ Features:
 Currently available providers:
 
 - AI: OpenAI compatible, SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Ollama and more
-- Web Search: Tavily (1000 free credits / month), Firecrawl (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE
+- Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE
 
 Please give a 🌟 Star if you like this project!
 
