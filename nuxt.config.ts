@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { version as projVersion } from './public/version.json'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -69,6 +70,22 @@ export default defineNuxtConfig({
           },
         },
       },
+    },
+  },
+
+  hooks: {
+    // The Firecrawl SDK dynamically imports Node-only `undici` for its
+    // websocket job watcher, which the browser `search()` path never uses.
+    // Alias it to an empty stub in the *client* build so Rollup can bundle the
+    // SDK without trying to resolve undici. Server (Nitro) keeps the real one.
+    'vite:extendConfig'(config, { isClient }) {
+      if (isClient) {
+        config.resolve ||= {}
+        config.resolve.alias = {
+          ...config.resolve.alias,
+          undici: fileURLToPath(new URL('./build/undici-browser-stub.ts', import.meta.url)),
+        }
+      }
     },
   },
 
