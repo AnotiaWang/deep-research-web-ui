@@ -75,6 +75,10 @@
       value: 'openrouter',
     },
     {
+      label: 'Requesty',
+      value: 'requesty',
+    },
+    {
       label: 'Ollama',
       value: 'ollama',
     },

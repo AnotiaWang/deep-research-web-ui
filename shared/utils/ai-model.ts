@@ -47,6 +47,9 @@ export function getApiBase(config: ConfigAi) {
   if (config.provider === 'openrouter') {
     return config.apiBase || 'https://openrouter.ai/api/v1'
   }
+  if (config.provider === 'requesty') {
+    return config.apiBase || 'https://router.requesty.ai/v1'
+  }
   if (config.provider === 'deepseek') {
     return config.apiBase || 'https://api.deepseek.com/v1'
   }
