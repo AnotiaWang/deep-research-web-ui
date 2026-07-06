@@ -6,6 +6,7 @@ export type ConfigAiProvider =
   | 'openrouter'
   | 'deepseek'
   | 'ollama'
+  | 'litellm'
 
 export type ConfigWebSearchProvider = 'tavily' | 'firecrawl' | 'crw' | 'google-pse'
 
