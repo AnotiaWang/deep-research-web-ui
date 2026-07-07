@@ -21,6 +21,18 @@ Currently available providers:
 
 Please give a 🌟 Star if you like this project!
 
+---
+
+Sponsors
+
+<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">MangoProxy</a> provides Residential, ISP, Mobile, and Datacenter proxies in 200+ locations for web scraping, automation, SEO, and multi-account management. Promo code: `GITHUBISP` – 8% off Static ISP proxies.
+
+<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">
+<img width="500" alt="Horizontal Logo For White Background" src="https://github.com/user-attachments/assets/bef14f25-e95b-472a-985c-56ae7b116a10" />
+</a>
+
+---
+
 ## How to use
 
 Live demo: <a href="https://deep-research.ataw.top" target="_blank">https://deep-research.ataw.top</a>
