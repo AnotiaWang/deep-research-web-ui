@@ -23,12 +23,20 @@ Please give a 🌟 Star if you like this project!
 
 ---
 
-Sponsors
+**Sponsors**
 
-<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">MangoProxy</a> provides Residential, ISP, Mobile, and Datacenter proxies in 200+ locations for web scraping, automation, SEO, and multi-account management. Promo code: `GITHUBISP` – 8% off Static ISP proxies.
+<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">MangoProxy</a> provides Residential, ISP, Mobile, and Datacenter proxies in 200+ locations for web scraping, automation, SEO, and multi-account management. Promo code: `GITHUBISP` - 8% off Static ISP proxies.
 
 <a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">
-<img width="500" alt="Horizontal Logo For White Background" src="https://github.com/user-attachments/assets/bef14f25-e95b-472a-985c-56ae7b116a10" />
+<img width="500" alt="MangoProxy" src="https://github.com/user-attachments/assets/bef14f25-e95b-472a-985c-56ae7b116a10" />
+</a>
+
+---
+
+<a href="https://www.swiftproxy.net/?ref=Anotia" target="_blank">Swiftproxy</a> provides high-quality residential proxies for web scraping, browser automation, AI workflows, and multi-account management. Promo code: `PROXY90` - 10% off.
+
+<a href="https://www.swiftproxy.net/?ref=Anotia" target="_blank">
+<img width="500" alt="Swiftproxy" src="https://github.com/user-attachments/assets/c70bd420-4cd3-475a-9a18-5039d90fea32" />
 </a>
 
 ---
