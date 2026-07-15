@@ -1,14 +1,19 @@
 <script setup lang="ts">
   import { feedbackInjectionKey, formInjectionKey } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
+  import type {
+    ResearchFeedbackResult,
+    ResearchInputSnapshot,
+  } from '~~/shared/types/research-session'
 
-  export interface ResearchFeedbackResult {
-    assistantQuestion: string
-    userAnswer: string
+  export interface GetFeedbackOptions {
+    input: ResearchInputSnapshot
+    isCurrent: () => boolean
   }
 
   const props = defineProps<{
     isLoadingSearch?: boolean
+    disabled?: boolean
   }>()
 
   defineEmits<{
@@ -37,10 +42,19 @@
       feedback.value.some((v) => !v.assistantQuestion || !v.userAnswer) ||
       // Should not be loading
       isLoading.value ||
-      props.isLoadingSearch,
+      props.isLoadingSearch ||
+      props.disabled,
   )
 
-  async function getFeedback() {
+  let activeRequest = 0
+
+  async function getFeedback(options?: GetFeedbackOptions) {
+    const requestId = ++activeRequest
+    const input = options?.input ?? form.value
+    const isCurrent = options?.isCurrent ?? (() => requestId === activeRequest)
+    clear()
+    activeRequest = requestId
+
     if (!isConfigValid.value && !isServerMode.value) {
       toast.add({
         title: t('index.missingConfigTitle'),
@@ -48,19 +62,19 @@
         color: 'error',
       })
       showConfigManager.value = true
-      return
+      throw new Error(t('index.missingConfigDescription'))
     }
-    clear()
     isLoading.value = true
     try {
       const chunks = await feedbackFunction({
-        query: form.value.query,
-        numQuestions: form.value.numQuestions,
+        query: input.query,
+        numQuestions: input.numQuestions,
         language: t('language', {}, { locale: locale.value }),
         aiConfig: config.value.ai,
       })
 
       for await (const chunk of chunks) {
+        if (!isCurrent()) return
         if (chunk.type === 'reasoning') {
           reasoningContent.value += chunk.delta
         } else if (chunk.type === 'error') {
@@ -82,26 +96,33 @@
           error.value = t('invalidStructuredOutput')
         }
       }
-      console.log(`[ResearchFeedback] query: ${form.value.query}, feedback:`, feedback.value)
+      if (!isCurrent()) return
+      console.log(`[ResearchFeedback] query: ${input.query}, feedback:`, feedback.value)
       // Check if model returned questions
       if (!feedback.value.length) {
         error.value = t('modelFeedback.noQuestions')
       }
+      if (error.value) throw new Error(error.value)
+      return feedback.value.map((item) => ({ ...item }))
     } catch (e: any) {
+      if (!isCurrent()) return
       console.error('Error getting feedback:', e)
       if (e.message?.includes('Failed to fetch')) {
         e.message += `\n${t('error.requestBlockedByCORS')}`
       }
       error.value = t('modelFeedback.error', [e.message])
+      throw e
     } finally {
-      isLoading.value = false
+      if (requestId === activeRequest) isLoading.value = false
     }
   }
 
   function clear() {
+    activeRequest += 1
     feedback.value = []
     error.value = ''
     reasoningContent.value = ''
+    isLoading.value = false
   }
 
   defineExpose({
@@ -133,7 +154,7 @@
 
         <div v-for="(feedback, index) in feedback" class="flex flex-col gap-2" :key="index">
           {{ feedback.assistantQuestion }}
-          <UInput v-model="feedback.userAnswer" />
+          <UInput v-model="feedback.userAnswer" :disabled="disabled" />
         </div>
       </template>
       <UButton

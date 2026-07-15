@@ -2,6 +2,10 @@
   import type { ResearchHistoryItem } from '~/types/history'
   import { useHistory } from '~/composables/useHistory'
 
+  const props = defineProps<{
+    disabled?: boolean
+  }>()
+
   const { t } = useI18n()
   const toast = useToast()
   const { history, removeHistoryItem, exportHistoryItem, importHistoryItem, clearHistory } =
@@ -91,6 +95,7 @@
   }
 
   const loadHistoryItem = (item: ResearchHistoryItem) => {
+    if (props.disabled) return
     // 这里需要与主页面通信，加载历史记录
     emit('load', item as ResearchHistoryItem)
     showModal.value = false
@@ -111,7 +116,13 @@
 
 <template>
   <UModal v-model:open="showModal" :title="t('history.title')" size="xl">
-    <UButton color="primary" variant="subtle" icon="i-lucide-history" @click="showModal = true" />
+    <UButton
+      color="primary"
+      variant="subtle"
+      icon="i-lucide-history"
+      :disabled="props.disabled"
+      @click="showModal = true"
+    />
     <template #body>
       <div class="flex flex-col gap-4">
         <!-- 导入按钮和删除全部 -->
@@ -174,6 +185,7 @@
                   variant="ghost"
                   size="sm"
                   icon="i-lucide-folder-open"
+                  :disabled="props.disabled"
                   @click="loadHistoryItem(item as ResearchHistoryItem)"
                 >
                   {{ t('history.load') }}

@@ -161,6 +161,26 @@
     "breadth": "广度",
     "questions": "问题数"
   },
+  "researchSession": {
+    "status": {
+      "idle": "就绪",
+      "running": "进行中",
+      "awaiting-input": "等待回答",
+      "cancelling": "正在取消",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消",
+      "timed-out": "已超时"
+    },
+    "phase": {
+      "feedback": "模型反馈",
+      "research": "联网研究",
+      "report": "研究报告"
+    },
+    "noFeedback": "模型反馈没有返回问题。",
+    "noLearnings": "研究已结束，但没有生成结论。",
+    "noReport": "报告生成没有返回内容。"
+  },
   "common": {
     "delete": "删除",
     "cancel": "取消"

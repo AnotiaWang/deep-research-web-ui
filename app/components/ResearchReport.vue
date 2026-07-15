@@ -6,6 +6,28 @@
   } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
   import { createCitationHtml, renderSafeMarkdown } from '~/utils/markdown'
+  import { getStreamErrorMessage } from '~~/shared/utils/stream-error'
+  import type {
+    ResearchFeedbackSnapshot,
+    ResearchInputSnapshot,
+    ResearchResult,
+  } from '~~/shared/types/research-session'
+
+  export interface GenerateReportOptions {
+    input: ResearchInputSnapshot
+    feedback: ReadonlyArray<ResearchFeedbackSnapshot>
+    result: ResearchResult
+    isCurrent: () => boolean
+  }
+
+  const props = defineProps<{
+    disabled?: boolean
+  }>()
+
+  const emit = defineEmits<{
+    (e: 'complete', report: string): void
+    (e: 'regenerate'): void
+  }>()
 
   const { t, locale } = useI18n()
   const { config } = storeToRefs(useConfigStore())
@@ -125,36 +147,40 @@
 
   let printJS: typeof import('print-js') | undefined
 
-  async function generateReport() {
+  let activeReport = 0
+
+  async function generateReport(options?: GenerateReportOptions) {
+    const reportId = ++activeReport
+    const input = options?.input ?? form.value
+    const feedbackSnapshot = options?.feedback ?? feedback.value
+    const result = options?.result ?? researchResult.value
+    const isCurrent = options?.isCurrent ?? (() => reportId === activeReport)
+    const previousReport = reportContent.value
     loading.value = true
     error.value = ''
     reportContent.value = ''
     reasoningContent.value = ''
     try {
       // Store a copy of the data
-      const learnings = [...researchResult.value.learnings]
+      const learnings = [...result.learnings]
       console.log(`[generateReport] Generating report. Learnings:`, learnings)
       const { fullStream } = await reportFunction({
-        prompt: getCombinedQuery(form.value, feedback.value),
+        prompt: getCombinedQuery(input, [...feedbackSnapshot]),
         language: t('language', {}, { locale: locale.value }),
         learnings,
         aiConfig: config.value.ai,
       })
-      let streamFailed = false
       for await (const chunk of fullStream) {
+        if (!isCurrent()) return
         if (chunk.type === 'reasoning') {
           reasoningContent.value += chunk.textDelta
         } else if (chunk.type === 'text-delta') {
           reportContent.value += chunk.textDelta
         } else if (chunk.type === 'error') {
-          error.value = t('researchReport.generateFailed', [
-            chunk.error instanceof Error ? chunk.error.message : String(chunk.error),
-          ])
-          streamFailed = true
-          break
+          throw new Error(getStreamErrorMessage(chunk as { error?: unknown; message?: unknown }))
         }
       }
-      if (streamFailed) return
+      if (!isCurrent()) return
 
       reportContent.value += `\n\n## ${t('researchReport.sources')}\n\n${learnings
         .map((item, index) => `${index + 1}. [${item.title || item.url}](${item.url})`)
@@ -162,11 +188,15 @@
 
       // 触发完成事件
       emit('complete', reportContent.value)
+      return reportContent.value
     } catch (e: any) {
+      if (!isCurrent()) return
       console.error(`Generate report failed`, e)
+      reportContent.value = previousReport
       error.value = t('researchReport.generateFailed', [e.message])
+      throw e
     } finally {
-      loading.value = false
+      if (reportId === activeReport) loading.value = false
     }
   }
 
@@ -240,11 +270,8 @@
     }
   }
 
-  const emit = defineEmits<{
-    (e: 'complete', report: string): void
-  }>()
-
   function displayReport(report: string) {
+    activeReport += 1
     // 直接显示已有的报告内容
     reportContent.value = report
     reasoningContent.value = '' // 清空推理内容，因为不是新生成的
@@ -265,7 +292,13 @@
     <template #header>
       <div class="flex items-center justify-between gap-2">
         <h2 class="font-bold">{{ $t('researchReport.title') }}</h2>
-        <UButton icon="i-lucide-refresh-cw" :loading variant="ghost" @click="generateReport">
+        <UButton
+          icon="i-lucide-refresh-cw"
+          :loading
+          :disabled="props.disabled"
+          variant="ghost"
+          @click="emit('regenerate')"
+        >
           {{ $t('researchReport.regenerate') }}
         </UButton>
       </div>

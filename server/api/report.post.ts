@@ -1,5 +1,6 @@
 import { writeFinalReport } from '~~/lib/core/deep-research'
 import type { ConfigAi } from '~~/shared/types/config'
+import { getStreamErrorMessage } from '~~/shared/utils/stream-error'
 
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
@@ -42,13 +43,18 @@ export default defineEventHandler(async (event) => {
         })
 
         for await (const chunk of reportGenerator.fullStream) {
-          const data = `data: ${JSON.stringify(chunk)}\n\n`
+          const serializableChunk =
+            chunk.type === 'error' ? { type: 'error', error: getStreamErrorMessage(chunk) } : chunk
+          const data = `data: ${JSON.stringify(serializableChunk)}\n\n`
           controller.enqueue(encoder.encode(data))
         }
 
         controller.close()
       } catch (error: any) {
-        const errorData = `data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`
+        const errorData = `data: ${JSON.stringify({
+          type: 'error',
+          error: getStreamErrorMessage({ error }),
+        })}\n\n`
         controller.enqueue(encoder.encode(errorData))
         controller.close()
       }

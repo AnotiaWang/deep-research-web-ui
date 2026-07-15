@@ -1,5 +1,4 @@
-import type { ResearchFeedbackResult } from '~/components/ResearchFeedback.vue'
-import type { ResearchInputData } from '~/components/ResearchForm.vue'
+import type { ResearchFeedbackResult, ResearchInputData } from '~~/shared/types/research-session'
 
 export function getCombinedQuery(form: ResearchInputData, feedback: ResearchFeedbackResult[]) {
   return `Initial Query: ${form.query}

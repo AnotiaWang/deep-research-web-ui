@@ -1,15 +1,10 @@
 <script setup lang="ts">
   import { formInjectionKey } from '~/constants/injection-keys'
 
-  export interface ResearchInputData {
-    query: string
-    breadth: number
-    depth: number
-    numQuestions: number
-  }
-
   defineProps<{
     isLoadingFeedback: boolean
+    disabled?: boolean
+    submitDisabled?: boolean
   }>()
 
   const emit = defineEmits<{
@@ -39,6 +34,7 @@
           v-model="form.query"
           :rows="3"
           :placeholder="$t('researchTopic.placeholder')"
+          :disabled="disabled"
           required
         />
       </UFormField>
@@ -55,17 +51,34 @@
             :min="1"
             :max="5"
             :step="1"
+            :disabled="disabled"
           />
         </UFormField>
 
         <UFormField :label="$t('researchTopic.depth')" required>
           <template #help>{{ $t('researchTopic.depthHelp') }}</template>
-          <UInput v-model="form.depth" class="w-full" type="number" :min="1" :max="8" :step="1" />
+          <UInput
+            v-model="form.depth"
+            class="w-full"
+            type="number"
+            :min="1"
+            :max="8"
+            :step="1"
+            :disabled="disabled"
+          />
         </UFormField>
 
         <UFormField :label="$t('researchTopic.breadth')" required>
           <template #help>{{ $t('researchTopic.breadthHelp') }}</template>
-          <UInput v-model="form.breadth" class="w-full" type="number" :min="1" :max="8" :step="1" />
+          <UInput
+            v-model="form.breadth"
+            class="w-full"
+            type="number"
+            :min="1"
+            :max="8"
+            :step="1"
+            :disabled="disabled"
+          />
         </UFormField>
       </div>
     </div>
@@ -75,7 +88,7 @@
         type="submit"
         color="primary"
         :loading="isLoadingFeedback"
-        :disabled="isSubmitButtonDisabled"
+        :disabled="disabled || submitDisabled || isSubmitButtonDisabled"
         block
         @click="handleSubmit"
       >

@@ -4,6 +4,7 @@
 
   defineProps<{
     node: DeepResearchNode
+    disabled?: boolean
   }>()
 
   defineEmits<{
@@ -21,13 +22,17 @@
       :description="node.error"
       color="error"
       variant="soft"
-      :actions="[
-        {
-          label: $t('webBrowsing.retry'),
-          color: 'secondary',
-          onClick: () => $emit('retry', node.id),
-        },
-      ]"
+      :actions="
+        disabled
+          ? []
+          : [
+              {
+                label: $t('webBrowsing.retry'),
+                color: 'secondary',
+                onClick: () => $emit('retry', node.id),
+              },
+            ]
+      "
     />
     <h2 class="text-xl font-bold my-2">
       {{ node.label ?? $t('webBrowsing.generating') }}

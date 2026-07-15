@@ -161,6 +161,26 @@
     "breadth": "Breadth",
     "questions": "Questions"
   },
+  "researchSession": {
+    "status": {
+      "idle": "Ready",
+      "running": "Running",
+      "awaiting-input": "Waiting for answers",
+      "cancelling": "Cancelling",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "timed-out": "Timed out"
+    },
+    "phase": {
+      "feedback": "model feedback",
+      "research": "web research",
+      "report": "report"
+    },
+    "noFeedback": "Feedback generation did not produce questions.",
+    "noLearnings": "Research completed without learnings.",
+    "noReport": "Report generation did not produce content."
+  },
   "common": {
     "delete": "Delete",
     "cancel": "Cancel"

@@ -16,6 +16,12 @@
   import { isChildNode, isParentNode, isRootNode } from '~/utils/tree-node'
   import { UCard, UModal, UButton } from '#components'
   import { useServerMode } from '~/composables/useServerMode'
+  import { collectResearchResult } from '~/utils/research-result'
+  import type {
+    ResearchFeedbackSnapshot,
+    ResearchInputSnapshot,
+    ResearchResult,
+  } from '~~/shared/types/research-session'
 
   export type DeepResearchNodeStatus = Exclude<ResearchStep['type'], 'complete'>
 
@@ -36,8 +42,18 @@
     error?: string
   }
 
+  export interface StartResearchOptions {
+    input: ResearchInputSnapshot
+    feedback: ReadonlyArray<ResearchFeedbackSnapshot>
+    isCurrent: () => boolean
+  }
+
+  const props = defineProps<{
+    disabled?: boolean
+  }>()
+
   const emit = defineEmits<{
-    (e: 'complete'): void
+    (e: 'retry', nodeId: string): void
   }>()
 
   const toast = useToast()
@@ -72,7 +88,10 @@
   const feedback = inject(feedbackInjectionKey)!
   const completeResult = inject(researchResultInjectionKey)!
 
-  function handleResearchProgress(step: ResearchStep) {
+  function handleResearchProgress(
+    step: ResearchStep,
+    updateCompleteResult = true,
+  ): ResearchResult | undefined {
     let node: DeepResearchNode | undefined
     let nodeId = ''
 
@@ -189,12 +208,12 @@
 
       case 'complete':
         console.log(`[DeepResearch] complete:`, step)
-        completeResult.value = {
+        const result = {
           learnings: step.learnings,
         }
-        emit('complete')
+        if (updateCompleteResult) completeResult.value = result
         isLoading.value = false
-        break
+        return result
     }
   }
 
@@ -217,8 +236,15 @@
     }
   }
 
-  async function startResearch(retryNode?: DeepResearchNode) {
-    if (!form.value.query || !form.value.breadth || !form.value.depth) return
+  let activeResearch = 0
+
+  async function startResearch(options?: StartResearchOptions, retryNode?: DeepResearchNode) {
+    const input = options?.input ?? form.value
+    const feedbackSnapshot = options?.feedback ?? feedback.value
+    if (!input.query || !input.breadth || !input.depth) return
+    const researchId = ++activeResearch
+    const isCurrent = options?.isCurrent ?? (() => researchId === activeResearch)
+    let result: ResearchResult | undefined
 
     // Clear all nodes if it's not a retry
     if (!retryNode) {
@@ -238,10 +264,10 @@
     await new Promise((r) => requestAnimationFrame(r))
 
     try {
-      let query = getCombinedQuery(form.value, feedback.value)
+      let query = getCombinedQuery(input, [...feedbackSnapshot])
       let existingLearnings: ProcessedSearchResult['learnings'] = []
       let currentDepth = 1
-      let breadth = form.value.breadth
+      let breadth = input.breadth
 
       if (retryNode) {
         query = retryNode.label
@@ -262,24 +288,38 @@
         currentDepth,
         breadth,
         aiConfig: config.ai,
-        maxDepth: form.value.depth,
+        maxDepth: input.depth,
         languageCode: locale.value,
         searchLanguageCode: config.webSearch.searchLanguage,
         learnings: existingLearnings,
-        onProgress: handleResearchProgress,
+        onProgress: (step) => {
+          if (!isCurrent()) return
+          result = handleResearchProgress(step, !retryNode) ?? result
+        },
       })
+      if (!isCurrent()) return
+      if (retryNode) {
+        if (retryNode.id !== '0' && !searchResults.value[retryNode.id]?.learnings?.length) {
+          return
+        }
+
+        return collectResearchResult(Object.values(searchResults.value))
+      }
+      return result
     } catch (error) {
+      if (!isCurrent()) return
       console.error('Research failed:', error)
+      if (options) throw error
     } finally {
-      if (!retryNode) {
+      if (!retryNode && researchId === activeResearch) {
         isLoading.value = false
       }
     }
   }
 
-  async function retryNode(nodeId: string) {
+  async function retryNode(nodeId: string, options?: StartResearchOptions) {
     console.log('[DeepResearch] retryNode', nodeId, isLoading.value)
-    if (!nodeId || isLoading.value) return
+    if (!nodeId || isLoading.value || (props.disabled && !options)) return
 
     // Remove all child nodes first
     nodes.value = nodes.value.filter((n) => !isChildNode(nodeId, n.id))
@@ -308,7 +348,18 @@
       })
     }
 
-    await startResearch(nodeCurrentData)
+    return startResearch(options, nodeCurrentData)
+  }
+
+  function clear() {
+    activeResearch += 1
+    nodes.value = [{ ...rootNode }]
+    selectedNodeId.value = undefined
+    searchResults.value = {}
+    flowNodes.value = [flowRootNode()]
+    flowEdges.value = []
+    isLoading.value = false
+    nextTick(() => flowRef.value?.reset())
   }
 
   let scrollY = 0
@@ -328,6 +379,8 @@
 
   defineExpose({
     startResearch,
+    retryNode,
+    clear,
     isLoading,
   })
 </script>
@@ -372,7 +425,11 @@
             isLargeScreen ? 'border-l w-1/3' : 'h-1/2 pt-2',
           ]"
         >
-          <NodeDetail :node="selectedNode" @retry="retryNode" />
+          <NodeDetail
+            :node="selectedNode"
+            :disabled="props.disabled"
+            @retry="emit('retry', $event)"
+          />
         </div>
       </div>
     </template>
@@ -407,7 +464,12 @@
         :selected-node-id="selectedNodeId"
         @node-click="selectNode"
       />
-      <NodeDetail v-if="selectedNode" :node="selectedNode" @retry="retryNode" />
+      <NodeDetail
+        v-if="selectedNode"
+        :node="selectedNode"
+        :disabled="props.disabled"
+        @retry="emit('retry', $event)"
+      />
     </div>
   </UCard>
 </template>

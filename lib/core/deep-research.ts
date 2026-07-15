@@ -6,10 +6,9 @@ import { trimPrompt } from '../ai/providers'
 import { languagePrompt, systemPrompt } from '../prompt'
 import zodToJsonSchema from 'zod-to-json-schema'
 import { throwAiError } from '~~/shared/utils/errors'
+import type { ResearchResult } from '~~/shared/types/research-session'
 
-export type ResearchResult = {
-  learnings: ProcessedSearchResult['learnings']
-}
+export type { ResearchResult } from '~~/shared/types/research-session'
 
 export interface WriteFinalReportParams {
   prompt: string

@@ -157,6 +157,26 @@
     "breadth": "Breedte",
     "questions": "Vragen"
   },
+  "researchSession": {
+    "status": {
+      "idle": "Gereed",
+      "running": "Bezig",
+      "awaiting-input": "Wachten op antwoorden",
+      "cancelling": "Annuleren",
+      "completed": "Voltooid",
+      "failed": "Mislukt",
+      "cancelled": "Geannuleerd",
+      "timed-out": "Time-out"
+    },
+    "phase": {
+      "feedback": "modelfeedback",
+      "research": "webonderzoek",
+      "report": "rapport"
+    },
+    "noFeedback": "De modelfeedback bevatte geen vragen.",
+    "noLearnings": "Het onderzoek is zonder resultaten voltooid.",
+    "noReport": "Het rapport bevatte geen inhoud."
+  },
   "common": {
     "delete": "Verwijderen",
     "cancel": "Annuleren"
