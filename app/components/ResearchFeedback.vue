@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { feedbackInjectionKey, formInjectionKey } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
+  import { mergeFeedbackQuestions } from '~/utils/feedback'
   import type {
     ResearchFeedbackResult,
     ResearchInputSnapshot,
@@ -80,18 +81,7 @@
         } else if (chunk.type === 'error') {
           error.value = chunk.message
         } else if (chunk.type === 'object') {
-          const questions = chunk.value.questions!.filter((s: any) => typeof s === 'string')
-          // Incrementally update modelValue
-          for (let i = 0; i < questions.length; i += 1) {
-            if (feedback.value[i]) {
-              feedback.value[i]!.assistantQuestion = questions[i]!
-            } else {
-              feedback.value.push({
-                assistantQuestion: questions[i]!,
-                userAnswer: '',
-              })
-            }
-          }
+          feedback.value = mergeFeedbackQuestions(feedback.value, chunk.value.questions)
         } else if (chunk.type === 'bad-end') {
           error.value = t('invalidStructuredOutput')
         }
