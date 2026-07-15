@@ -18,6 +18,7 @@
     feedback: ReadonlyArray<ResearchFeedbackSnapshot>
     result: ResearchResult
     isCurrent: () => boolean
+    signal?: AbortSignal
   }
 
   const props = defineProps<{
@@ -169,6 +170,7 @@
         language: t('language', {}, { locale: locale.value }),
         learnings,
         aiConfig: config.value.ai,
+        signal: options?.signal,
       })
       for await (const chunk of fullStream) {
         if (!isCurrent()) return
@@ -196,7 +198,13 @@
       error.value = t('researchReport.generateFailed', [e.message])
       throw e
     } finally {
-      if (reportId === activeReport) loading.value = false
+      if (reportId === activeReport) {
+        if (!isCurrent()) {
+          reportContent.value = previousReport
+          reasoningContent.value = ''
+        }
+        loading.value = false
+      }
     }
   }
 

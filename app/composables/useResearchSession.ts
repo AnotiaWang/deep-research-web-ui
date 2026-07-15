@@ -1,5 +1,6 @@
 import { computed, readonly, shallowRef } from 'vue'
 import type { ResearchHistoryItem } from '~/types/history'
+import { createRuntimeId } from '~~/shared/utils/id'
 import type {
   ResearchFailure,
   ResearchFeedbackResult,
@@ -53,7 +54,7 @@ export type ResearchSessionEvent =
       type: 'RESEARCH_RETRY_FAILED'
       sessionId: string
       operationId: string
-      fallbackStatus: 'completed' | 'failed'
+      fallbackStatus: ResearchRetryFallbackStatus
       fallbackPhase?: ResearchPhase
       fallbackFailure?: ResearchFailure
       at: string
@@ -95,6 +96,7 @@ export type ResearchSessionEvent =
       sessionId: string
       operationId: string
       phase: ResearchPhase
+      message?: string
       at: string
     }
   | { type: 'LOAD_HISTORY'; sessionId: string; item: ResearchHistoryItem; at: string }
@@ -107,6 +109,30 @@ export function createInitialResearchSession(): ResearchSession {
     result: { learnings: [] },
     report: '',
   }
+}
+
+export function canBeginFeedbackFromSession(state: Pick<ResearchSession, 'status'>) {
+  return ['idle', 'completed', 'failed', 'cancelled', 'timed-out'].includes(state.status)
+}
+
+export function canRetryResearchFromSession(state: Pick<ResearchSession, 'status' | 'phase'>) {
+  return (
+    state.status === 'completed' ||
+    (['failed', 'cancelled', 'timed-out'].includes(state.status) &&
+      (state.phase === 'research' || state.phase === 'report'))
+  )
+}
+
+export function canRegenerateReportFromSession(
+  state: Pick<ResearchSession, 'status' | 'phase' | 'historyId' | 'input' | 'result'>,
+) {
+  return (
+    !!state.input &&
+    !!state.historyId &&
+    state.result.learnings.length > 0 &&
+    (state.status === 'completed' ||
+      (['failed', 'cancelled', 'timed-out'].includes(state.status) && state.phase === 'report'))
+  )
 }
 
 function snapshotInput(input: ResearchInputData): ResearchInputSnapshot {
@@ -171,7 +197,7 @@ export function researchSessionReducer(
 ): ResearchSession {
   switch (event.type) {
     case 'BEGIN_FEEDBACK':
-      if (!['idle', 'completed', 'failed', 'cancelled', 'timed-out'].includes(state.status)) {
+      if (!canBeginFeedbackFromSession(state)) {
         return state
       }
       return {
@@ -218,14 +244,7 @@ export function researchSessionReducer(
       )
 
     case 'BEGIN_RESEARCH_RETRY':
-      if (
-        state.id !== event.sessionId ||
-        !state.input ||
-        !(
-          state.status === 'completed' ||
-          (state.status === 'failed' && (state.phase === 'research' || state.phase === 'report'))
-        )
-      ) {
+      if (state.id !== event.sessionId || !state.input || !canRetryResearchFromSession(state)) {
         return state
       }
       return revise(
@@ -269,12 +288,7 @@ export function researchSessionReducer(
       )
 
     case 'BEGIN_REPORT':
-      if (
-        state.id !== event.sessionId ||
-        !state.input ||
-        !state.historyId ||
-        !(state.status === 'completed' || (state.status === 'failed' && state.phase === 'report'))
-      ) {
+      if (state.id !== event.sessionId || !canRegenerateReportFromSession(state)) {
         return state
       }
       return revise(
@@ -343,7 +357,7 @@ export function researchSessionReducer(
           failure: {
             phase: event.phase,
             code: 'upstream',
-            message: 'The operation timed out.',
+            message: event.message ?? 'The operation timed out.',
             retryable: true,
           },
         },
@@ -372,20 +386,25 @@ interface UseResearchSessionOptions {
   now?: () => string
 }
 
+type ResearchRetryFallbackStatus = 'completed' | 'failed' | 'cancelled' | 'timed-out'
+
 export interface ResearchRetryLease extends ResearchOperationLease {
-  fallbackStatus: 'completed' | 'failed'
+  fallbackStatus: ResearchRetryFallbackStatus
   fallbackPhase?: ResearchPhase
   fallbackFailure?: ResearchFailure
 }
 
 export function useResearchSession(options: UseResearchSessionOptions = {}) {
-  const createId = options.createId ?? (() => crypto.randomUUID())
+  const createId = options.createId ?? createRuntimeId
   const now = options.now ?? (() => new Date().toISOString())
   const state = shallowRef(createInitialResearchSession())
 
   const isRunning = computed(
     () => state.value.status === 'running' || state.value.status === 'cancelling',
   )
+  const canBeginFeedback = computed(() => canBeginFeedbackFromSession(state.value))
+  const canRetryResearch = computed(() => canRetryResearchFromSession(state.value))
+  const canRegenerateReport = computed(() => canRegenerateReportFromSession(state.value))
 
   function commit(event: ResearchSessionEvent) {
     state.value = researchSessionReducer(state.value, event)
@@ -451,7 +470,7 @@ export function useResearchSession(options: UseResearchSessionOptions = {}) {
     if (!lease) return
     return {
       ...lease,
-      fallbackStatus: previous.status === 'completed' ? 'completed' : 'failed',
+      fallbackStatus: previous.status as ResearchRetryFallbackStatus,
       fallbackPhase: previous.phase,
       fallbackFailure: previous.failure,
     } satisfies ResearchRetryLease
@@ -519,6 +538,41 @@ export function useResearchSession(options: UseResearchSessionOptions = {}) {
     })
   }
 
+  function requestCancellation(lease: ResearchOperationLease) {
+    const revision = state.value.revision
+    commit({
+      type: 'CANCEL_REQUESTED',
+      sessionId: lease.sessionId,
+      operationId: lease.operationId,
+      at: now(),
+    })
+    return state.value.revision !== revision && state.value.status === 'cancelling'
+  }
+
+  function completeCancellation(lease: ResearchOperationLease) {
+    const revision = state.value.revision
+    commit({
+      type: 'OPERATION_CANCELLED',
+      sessionId: lease.sessionId,
+      operationId: lease.operationId,
+      at: now(),
+    })
+    return state.value.revision !== revision && state.value.status === 'cancelled'
+  }
+
+  function timeoutOperation(lease: ResearchOperationLease, phase: ResearchPhase, message?: string) {
+    const revision = state.value.revision
+    commit({
+      type: 'OPERATION_TIMED_OUT',
+      sessionId: lease.sessionId,
+      operationId: lease.operationId,
+      phase,
+      message,
+      at: now(),
+    })
+    return state.value.revision !== revision && state.value.status === 'timed-out'
+  }
+
   function loadHistory(item: ResearchHistoryItem) {
     const revision = state.value.revision
     commit({ type: 'LOAD_HISTORY', sessionId: createId(), item, at: now() })
@@ -536,6 +590,9 @@ export function useResearchSession(options: UseResearchSessionOptions = {}) {
   return {
     state: readonly(state),
     isRunning,
+    canBeginFeedback,
+    canRetryResearch,
+    canRegenerateReport,
     beginFeedback,
     completeFeedback,
     beginResearch,
@@ -545,6 +602,9 @@ export function useResearchSession(options: UseResearchSessionOptions = {}) {
     beginReport,
     completeReport,
     failOperation,
+    requestCancellation,
+    completeCancellation,
+    timeoutOperation,
     loadHistory,
     isCurrentOperation,
   }

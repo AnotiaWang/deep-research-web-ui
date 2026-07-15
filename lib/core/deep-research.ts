@@ -8,6 +8,7 @@ import zodToJsonSchema from 'zod-to-json-schema'
 import { throwAiError } from '~~/shared/utils/errors'
 import type { ResearchResult } from '~~/shared/types/research-session'
 import { normalizeGeneratedSearchQueries } from '~~/shared/utils/search-query'
+import { abortable, isAbortError, throwIfAborted } from '~~/shared/utils/abort'
 
 export type { ResearchResult } from '~~/shared/types/research-session'
 
@@ -16,6 +17,7 @@ export interface WriteFinalReportParams {
   learnings: ProcessedSearchResult['learnings']
   language: string
   aiConfig: ConfigAi
+  signal?: AbortSignal
 }
 
 // Used for streaming response
@@ -79,6 +81,7 @@ export function generateSearchQueries({
   language,
   searchLanguage,
   aiConfig,
+  signal,
 }: {
   query: string
   language: string
@@ -88,7 +91,9 @@ export function generateSearchQueries({
   /** Force the LLM to generate serp queries in a certain language */
   searchLanguage?: string
   aiConfig: ConfigAi
+  signal?: AbortSignal
 }) {
+  throwIfAborted(signal)
   const schema = z.object({
     queries: z
       .array(
@@ -125,6 +130,7 @@ export function generateSearchQueries({
     model: getLanguageModel(aiConfig),
     system: systemPrompt(),
     prompt,
+    abortSignal: signal,
     onError({ error }) {
       throwAiError('generateSearchQueries', error)
     },
@@ -150,6 +156,7 @@ function processSearchResult({
   numFollowUpQuestions = 3,
   language,
   aiConfig,
+  signal,
 }: {
   query: string
   results: WebSearchResult[]
@@ -157,7 +164,9 @@ function processSearchResult({
   numLearnings?: number
   numFollowUpQuestions?: number
   aiConfig: ConfigAi
+  signal?: AbortSignal
 }) {
+  throwIfAborted(signal)
   const schema = z.object({
     learnings: z
       .array(
@@ -194,6 +203,7 @@ function processSearchResult({
     model: getLanguageModel(aiConfig),
     system: systemPrompt(),
     prompt,
+    abortSignal: signal,
     onError({ error }) {
       throwAiError('processSearchResult', error)
     },
@@ -205,7 +215,9 @@ export function writeFinalReport({
   learnings,
   language,
   aiConfig,
+  signal,
 }: WriteFinalReportParams) {
+  throwIfAborted(signal)
   const learningsString = trimPrompt(
     learnings
       .map(
@@ -231,6 +243,7 @@ ${learning.learning}
     model: getLanguageModel(aiConfig),
     system: systemPrompt(),
     prompt: _prompt,
+    abortSignal: signal,
     onError({ error }) {
       throwAiError('writeFinalReport', error)
     },
@@ -251,6 +264,7 @@ export async function deepResearch({
   retryNode,
   webSearchFunction,
   pLimitInstance,
+  signal,
 }: {
   query: string
   breadth: number
@@ -271,10 +285,12 @@ export async function deepResearch({
   onProgress: (step: ResearchStep) => void
   webSearchFunction: (
     query: string,
-    options: { maxResults?: number; lang?: string },
+    options: { maxResults?: number; lang?: string; signal?: AbortSignal },
   ) => Promise<WebSearchResult[]>
   pLimitInstance?: any
+  signal?: AbortSignal
 }) {
+  throwIfAborted(signal)
   const language = languageCode
   const searchLanguage = searchLanguageCode
 
@@ -284,6 +300,10 @@ export async function deepResearch({
       return fn()
     },
     concurrency: 2,
+  }
+  const progress = (step: ResearchStep) => {
+    throwIfAborted(signal)
+    onProgress(step)
   }
 
   try {
@@ -309,6 +329,7 @@ export async function deepResearch({
         language,
         searchLanguage,
         aiConfig,
+        signal,
       })
 
       for await (const chunk of parseStreamingJson(
@@ -316,10 +337,11 @@ export async function deepResearch({
         searchQueriesTypeSchema,
         (value) => !!value.queries?.length && !!value.queries[0]?.query,
       )) {
+        throwIfAborted(signal)
         if (chunk.type === 'object' && chunk.value.queries) {
           searchQueries = normalizeGeneratedSearchQueries(chunk.value.queries, nodeId)
           for (let i = 0; i < searchQueries.length; i++) {
-            onProgress({
+            progress({
               type: 'generating_query',
               result: searchQueries[i]!,
               nodeId: searchQueries[i]!.nodeId,
@@ -328,20 +350,20 @@ export async function deepResearch({
           }
         } else if (chunk.type === 'reasoning') {
           // Reasoning part goes to the parent node
-          onProgress({
+          progress({
             type: 'generating_query_reasoning',
             delta: chunk.delta,
             nodeId,
           })
         } else if (chunk.type === 'error') {
-          onProgress({
+          progress({
             type: 'error',
             message: chunk.message,
             nodeId,
           })
           break
         } else if (chunk.type === 'bad-end') {
-          onProgress({
+          progress({
             type: 'error',
             message: 'Invalid structured output',
             nodeId,
@@ -350,13 +372,13 @@ export async function deepResearch({
         }
       }
 
-      onProgress({
+      progress({
         type: 'node_complete',
         nodeId,
       })
 
       for (const searchQuery of searchQueries) {
-        onProgress({
+        progress({
           type: 'generated_query',
           query: searchQuery.query!,
           result: searchQuery,
@@ -369,22 +391,28 @@ export async function deepResearch({
     const results = await Promise.all(
       searchQueries.map((searchQuery) =>
         limit(async () => {
+          throwIfAborted(signal)
           if (!searchQuery?.query) {
             return {
               learnings: [],
             }
           }
-          onProgress({
+          progress({
             type: 'searching',
             query: searchQuery.query,
             nodeId: searchQuery.nodeId,
           })
           try {
             // search the web
-            const results = await webSearchFunction(searchQuery.query, {
-              maxResults: 5,
-              lang: languageCode,
-            })
+            const results = await abortable(
+              webSearchFunction(searchQuery.query, {
+                maxResults: 5,
+                lang: languageCode,
+                signal,
+              }),
+              signal,
+            )
+            throwIfAborted(signal)
             if (!results.length) {
               throw new Error('No search results found')
             }
@@ -392,7 +420,7 @@ export async function deepResearch({
               `[DeepResearch] Searched "${searchQuery.query}", found ${results.length} contents`,
             )
 
-            onProgress({
+            progress({
               type: 'search_complete',
               results,
               nodeId: searchQuery.nodeId,
@@ -406,6 +434,7 @@ export async function deepResearch({
               numFollowUpQuestions: nextBreadth,
               language,
               aiConfig,
+              signal,
             })
             let searchResult: PartialProcessedSearchResult = {}
 
@@ -414,29 +443,30 @@ export async function deepResearch({
               searchResultTypeSchema,
               (value) => !!value.learnings?.length,
             )) {
+              throwIfAborted(signal)
               if (chunk.type === 'object') {
                 searchResult = chunk.value
-                onProgress({
+                progress({
                   type: 'processing_serach_result',
                   result: chunk.value,
                   query: searchQuery.query,
                   nodeId: searchQuery.nodeId,
                 })
               } else if (chunk.type === 'reasoning') {
-                onProgress({
+                progress({
                   type: 'processing_serach_result_reasoning',
                   delta: chunk.delta,
                   nodeId: searchQuery.nodeId,
                 })
               } else if (chunk.type === 'error') {
-                onProgress({
+                progress({
                   type: 'error',
                   message: chunk.message,
                   nodeId: searchQuery.nodeId,
                 })
                 break
               } else if (chunk.type === 'bad-end') {
-                onProgress({
+                progress({
                   type: 'error',
                   message: 'Invalid structured output',
                   nodeId: searchQuery.nodeId,
@@ -455,7 +485,7 @@ export async function deepResearch({
             const allLearnings = [...(learnings ?? []), ...(searchResult.learnings ?? [])]
             const nextDepth = currentDepth + 1
 
-            onProgress({
+            progress({
               type: 'node_complete',
               result: {
                 learnings: searchResult.learnings ?? [],
@@ -465,6 +495,7 @@ export async function deepResearch({
             })
 
             if (nextDepth <= maxDepth && searchResult.followUpQuestions?.length) {
+              throwIfAborted(signal)
               console.warn(`Researching deeper, breadth: ${nextBreadth}, depth: ${nextDepth}`)
 
               const nextQuery = `
@@ -480,13 +511,14 @@ export async function deepResearch({
                   breadth: nextBreadth,
                   maxDepth,
                   learnings: allLearnings,
-                  onProgress,
+                  onProgress: progress,
                   currentDepth: nextDepth,
                   nodeId: searchQuery.nodeId,
                   languageCode,
                   aiConfig,
                   webSearchFunction,
                   pLimitInstance: limit,
+                  signal,
                 })
                 return r
               } catch (error) {
@@ -500,8 +532,9 @@ export async function deepResearch({
               }
             }
           } catch (e: any) {
+            if (signal?.aborted || isAbortError(e)) throw e
             console.error(`Error in node ${searchQuery.nodeId} for query ${searchQuery.query}`, e)
-            onProgress({
+            progress({
               type: 'error',
               message: e.message,
               nodeId: searchQuery.nodeId,
@@ -513,6 +546,7 @@ export async function deepResearch({
         }),
       ),
     )
+    throwIfAborted(signal)
     // Conclude results
     // Deduplicate
     const urlMap = new Map<string, true>()
@@ -528,7 +562,7 @@ export async function deepResearch({
     }
     // Complete should only be called once
     if (nodeId === '0') {
-      onProgress({
+      progress({
         type: 'complete',
         learnings: finalLearnings,
       })
@@ -537,8 +571,9 @@ export async function deepResearch({
       learnings: finalLearnings,
     }
   } catch (error: any) {
+    if (signal?.aborted || isAbortError(error)) throw error
     console.error(error)
-    onProgress({
+    progress({
       type: 'error',
       message: error?.message ?? 'Something went wrong',
       nodeId,

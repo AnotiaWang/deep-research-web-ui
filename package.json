@@ -12,7 +12,7 @@
     "postinstall": "nuxt prepare",
     "format": "prettier --write app server lib shared",
     "lint": "prettier --check app server lib shared",
-    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\" \"lib/**/*.test.ts\"",
+    "test": "node --experimental-strip-types --import ./test/register-aliases.mjs --test \"test/**/*.test.ts\" \"lib/**/*.test.ts\"",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {

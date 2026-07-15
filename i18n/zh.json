@@ -179,7 +179,8 @@
     },
     "noFeedback": "模型反馈没有返回问题。",
     "noLearnings": "研究已结束，但没有生成结论。",
-    "noReport": "报告生成没有返回内容。"
+    "noReport": "报告生成没有返回内容。",
+    "timeoutMessage": "操作已超过时间限制，你现在可以重试。"
   },
   "common": {
     "delete": "删除",

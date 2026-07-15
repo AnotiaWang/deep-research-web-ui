@@ -175,7 +175,8 @@
     },
     "noFeedback": "De modelfeedback bevatte geen vragen.",
     "noLearnings": "Het onderzoek is zonder resultaten voltooid.",
-    "noReport": "Het rapport bevatte geen inhoud."
+    "noReport": "Het rapport bevatte geen inhoud.",
+    "timeoutMessage": "De bewerking heeft de tijdslimiet overschreden. Je kunt het nu opnieuw proberen."
   },
   "common": {
     "delete": "Verwijderen",

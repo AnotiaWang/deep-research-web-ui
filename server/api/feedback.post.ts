@@ -29,9 +29,14 @@ export default defineEventHandler(async (event) => {
   setHeader(event, 'Cache-Control', 'no-cache')
   setHeader(event, 'Connection', 'keep-alive')
 
+  const requestAbort = createRequestAbort(
+    event,
+    serverOperationTimeout(runtimeConfig.public.researchFeedbackTimeoutMs),
+  )
+
   const stream = new ReadableStream({
     async start(controller) {
-      const encoder = new TextEncoder()
+      const writer = createSSEWriter(controller, requestAbort.canWrite)
 
       try {
         const feedbackGenerator = generateFeedback({
@@ -39,19 +44,31 @@ export default defineEventHandler(async (event) => {
           language,
           numQuestions,
           aiConfig: serverConfig,
+          signal: requestAbort.signal,
         })
 
         for await (const chunk of feedbackGenerator) {
-          const data = `data: ${JSON.stringify(chunk)}\n\n`
-          controller.enqueue(encoder.encode(data))
+          if (requestAbort.signal.aborted) break
+          writer.write(chunk)
         }
-
-        controller.close()
       } catch (error: any) {
-        const errorData = `data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`
-        controller.enqueue(encoder.encode(errorData))
-        controller.close()
+        if (!requestAbort.signal.aborted) {
+          writer.write({ type: 'error', message: error.message })
+        }
+      } finally {
+        if (requestAbort.reason() === 'timeout') {
+          writer.write({
+            type: 'error',
+            code: 'timeout',
+            message: 'The feedback request timed out.',
+          })
+        }
+        requestAbort.cleanup()
+        writer.close()
       }
+    },
+    cancel() {
+      requestAbort.abort('stream-cancel')
     },
   })
 

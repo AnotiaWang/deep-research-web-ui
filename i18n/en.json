@@ -179,7 +179,8 @@
     },
     "noFeedback": "Feedback generation did not produce questions.",
     "noLearnings": "Research completed without learnings.",
-    "noReport": "Report generation did not produce content."
+    "noReport": "Report generation did not produce content.",
+    "timeoutMessage": "The operation exceeded its time limit. You can retry it now."
   },
   "common": {
     "delete": "Delete",

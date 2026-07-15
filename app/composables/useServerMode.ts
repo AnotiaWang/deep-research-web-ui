@@ -2,58 +2,24 @@ import { deepResearch as clientDeepResearch } from '~~/lib/core/deep-research'
 import { generateFeedback as clientGenerateFeedback } from '~~/lib/core/feedback'
 import { writeFinalReport as clientWriteFinalReport } from '~~/lib/core/deep-research'
 import type { ResearchStep } from '~~/lib/core/deep-research'
+import { OperationTimeoutError } from '~~/shared/utils/abort'
+import { parseSSEStream } from '~/utils/sse'
 
-async function* parseSSEStream(response: Response) {
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('No response body')
+function throwIfTimeoutFrame(value: unknown) {
+  if (!value || typeof value !== 'object') return
+  const frame = value as { type?: unknown; code?: unknown; message?: unknown; error?: unknown }
+  if (frame.type !== 'error' || frame.code !== 'timeout') return
 
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const message = typeof frame.message === 'string' ? frame.message : frame.error
+  throw new OperationTimeoutError(
+    typeof message === 'string' ? message : 'The operation timed out.',
+  )
+}
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) {
-      // 处理缓冲区中剩余的数据
-      if (buffer.trim()) {
-        const lines = buffer.split('\n\n')
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') return
-
-            try {
-              const step = JSON.parse(data)
-              yield step
-            } catch (e) {
-              console.error('Failed to parse SSE data:', e)
-            }
-          }
-        }
-      }
-      break
-    }
-
-    buffer += decoder.decode(value, { stream: true })
-
-    // 检查是否有完整的 SSE 消息
-    const lines = buffer.split('\n\n')
-
-    // 保留最后一个不完整的部分
-    buffer = lines.pop() || ''
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6)
-        if (data === '[DONE]') return
-
-        try {
-          const step = JSON.parse(data)
-          yield step
-        } catch (e) {
-          console.error('Failed to parse SSE data:', e)
-        }
-      }
-    }
+async function* parseServerOperationStream(response: Response) {
+  for await (const value of parseSSEStream(response)) {
+    throwIfTimeoutFrame(value)
+    yield value
   }
 }
 
@@ -73,6 +39,7 @@ export function useServerMode() {
     nodeId?: string
     retryNode?: any
     onProgress: (step: ResearchStep) => void
+    signal?: AbortSignal
   }) => {
     const {
       query,
@@ -85,6 +52,7 @@ export function useServerMode() {
       nodeId,
       retryNode,
       onProgress,
+      signal,
     } = params
 
     const response = await fetch('/api/research', {
@@ -103,9 +71,10 @@ export function useServerMode() {
         nodeId,
         retryNode,
       }),
+      signal,
     })
 
-    for await (const step of parseSSEStream(response)) {
+    for await (const step of parseServerOperationStream(response)) {
       onProgress(step)
     }
   }
@@ -115,8 +84,9 @@ export function useServerMode() {
     language: string
     numQuestions: number
     aiConfig: ConfigAi
+    signal?: AbortSignal
   }) {
-    const { query, language, numQuestions } = params
+    const { query, language, numQuestions, signal } = params
 
     const response = await fetch('/api/feedback', {
       method: 'POST',
@@ -128,9 +98,10 @@ export function useServerMode() {
         language,
         numQuestions,
       }),
+      signal,
     })
 
-    for await (const step of parseSSEStream(response)) {
+    for await (const step of parseServerOperationStream(response)) {
       yield step
     }
   }
@@ -140,8 +111,9 @@ export function useServerMode() {
     learnings: Array<{ url: string; learning: string }>
     language: string
     aiConfig: ConfigAi
+    signal?: AbortSignal
   }) => {
-    const { prompt, learnings, language } = params
+    const { prompt, learnings, language, signal } = params
 
     const response = await fetch('/api/report', {
       method: 'POST',
@@ -153,10 +125,11 @@ export function useServerMode() {
         learnings,
         language,
       }),
+      signal,
     })
 
     return {
-      fullStream: parseSSEStream(response),
+      fullStream: parseServerOperationStream(response),
     }
   }
 
@@ -176,6 +149,7 @@ export function useServerMode() {
           nodeId?: string
           retryNode?: any
           onProgress: (step: ResearchStep) => void
+          signal?: AbortSignal
         }) =>
           clientDeepResearch({
             ...params,

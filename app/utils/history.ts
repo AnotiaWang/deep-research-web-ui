@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { createRuntimeId } from '~~/shared/utils/id'
 import type {
   NewResearchHistoryItem,
   ResearchHistory,
@@ -52,7 +53,7 @@ export function createResearchHistoryItem(
   const timestamp = options.timestamp ?? new Date().toISOString()
   return {
     ...item,
-    id: options.id ?? crypto.randomUUID(),
+    id: options.id ?? createRuntimeId(),
     createdAt: timestamp,
     updatedAt: timestamp,
   }

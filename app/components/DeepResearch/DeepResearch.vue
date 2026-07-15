@@ -17,6 +17,8 @@
   import { UCard, UModal, UButton } from '#components'
   import { useServerMode } from '~/composables/useServerMode'
   import { collectResearchResult } from '~/utils/research-result'
+  import { resolveResearchRetryQuery } from '~/utils/research-retry'
+  import { abortable } from '~~/shared/utils/abort'
   import type {
     ResearchFeedbackSnapshot,
     ResearchInputSnapshot,
@@ -46,6 +48,7 @@
     input: ResearchInputSnapshot
     feedback: ReadonlyArray<ResearchFeedbackSnapshot>
     isCurrent: () => boolean
+    signal?: AbortSignal
   }
 
   const props = defineProps<{
@@ -287,17 +290,17 @@
       })
     }
 
-    // Wait after the flow is cleared
-    await new Promise((r) => requestAnimationFrame(r))
-
     try {
+      // Wait after the flow is cleared
+      await abortable(new Promise((resolve) => requestAnimationFrame(resolve)), options?.signal)
+
       let query = getCombinedQuery(input, [...feedbackSnapshot])
       let existingLearnings: ProcessedSearchResult['learnings'] = []
       let currentDepth = 1
       let breadth = input.breadth
 
       if (retryNode) {
-        query = retryNode.label
+        query = resolveResearchRetryQuery(query, retryNode)
         // Set the search depth and breadth to its parent's
         if (!isRootNode(retryNode.id)) {
           const parentId = parentNodeId(retryNode.id)!
@@ -319,6 +322,7 @@
         languageCode: locale.value,
         searchLanguageCode: config.webSearch.searchLanguage,
         learnings: existingLearnings,
+        signal: options?.signal,
         onProgress: (step) => {
           if (!isCurrent()) return
           result = handleResearchProgress(step, !retryNode) ?? result

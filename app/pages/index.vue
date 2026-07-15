@@ -38,11 +38,12 @@
           :status="session.status"
           :phase="session.phase"
           :failure="session.failure"
+          @cancel="cancelActiveOperation"
         />
 
         <ResearchForm
           :is-loading-feedback="isFeedbackRunning"
-          :disabled="isRunning"
+          :disabled="!canBeginFeedback"
           :submit-disabled="!canBeginFeedback"
           @submit="generateFeedback"
         />
@@ -78,6 +79,7 @@
     ResearchOperationLease,
     ResearchPhase,
   } from '~~/shared/types/research-session'
+  import { isTimeoutError } from '~~/shared/utils/abort'
   import {
     feedbackInjectionKey,
     formInjectionKey,
@@ -111,6 +113,9 @@
   const {
     state: session,
     isRunning,
+    canBeginFeedback,
+    canRetryResearch,
+    canRegenerateReport,
     beginFeedback,
     completeFeedback,
     beginResearch,
@@ -120,10 +125,23 @@
     beginReport,
     completeReport,
     failOperation,
+    requestCancellation,
+    completeCancellation,
+    timeoutOperation,
     loadHistory,
     isCurrentOperation,
   } = useResearchSession()
   const { addHistoryItem, updateHistoryItem } = useHistory()
+  const operationRuntime = useResearchOperationRuntime({
+    timeouts: {
+      feedback: runtimeConfig.public.researchFeedbackTimeoutMs,
+      research: runtimeConfig.public.researchResearchTimeoutMs,
+      report: runtimeConfig.public.researchReportTimeoutMs,
+    },
+    onTimeout(lease, phase) {
+      timeoutOperation(lease, phase, t('researchSession.timeoutMessage'))
+    },
+  })
 
   const isFeedbackRunning = computed(
     () => session.value.status === 'running' && session.value.phase === 'feedback',
@@ -131,22 +149,6 @@
   const isResearchRunning = computed(
     () => session.value.status === 'running' && session.value.phase === 'research',
   )
-  const canBeginFeedback = computed(() =>
-    ['idle', 'completed', 'failed', 'cancelled', 'timed-out'].includes(session.value.status),
-  )
-  const canRegenerateReport = computed(
-    () =>
-      session.value.result.learnings.length > 0 &&
-      (session.value.status === 'completed' ||
-        (session.value.status === 'failed' && session.value.phase === 'report')),
-  )
-  const canRetryResearch = computed(
-    () =>
-      session.value.status === 'completed' ||
-      (session.value.status === 'failed' &&
-        (session.value.phase === 'research' || session.value.phase === 'report')),
-  )
-
   function operationGuard(lease: ResearchOperationLease) {
     return () => isCurrentOperation(lease.sessionId, lease.operationId)
   }
@@ -163,9 +165,18 @@
     }
   }
 
+  function finishWithError(lease: ResearchOperationLease, phase: ResearchPhase, error: unknown) {
+    if (isTimeoutError(error)) {
+      timeoutOperation(lease, phase, t('researchSession.timeoutMessage'))
+    } else {
+      failOperation(lease, toFailure(phase, error))
+    }
+  }
+
   async function generateFeedback() {
     const lease = beginFeedback({ ...form.value })
     if (!lease) return
+    const signal = operationRuntime.start(lease, 'feedback')
 
     deepResearchRef.value?.clear()
     reportRef.value?.displayReport('')
@@ -174,24 +185,29 @@
       const result = await feedbackRef.value?.getFeedback({
         input: lease.input,
         isCurrent: operationGuard(lease),
+        signal,
       })
       if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
       if (!result) throw new Error(t('researchSession.noFeedback'))
       completeFeedback(lease, result)
     } catch (error) {
-      failOperation(lease, toFailure('feedback', error))
+      finishWithError(lease, 'feedback', error)
+    } finally {
+      operationRuntime.finish(lease)
     }
   }
 
   async function startDeepSearch() {
     const lease = beginResearch(feedback.value)
     if (!lease) return
+    const signal = operationRuntime.start(lease, 'research')
 
     try {
       const result = await deepResearchRef.value?.startResearch({
         input: lease.input,
         feedback: lease.feedback,
         isCurrent: operationGuard(lease),
+        signal,
       })
       if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
       if (!result?.learnings.length) throw new Error(t('researchSession.noLearnings'))
@@ -207,20 +223,25 @@
         report: '',
       })
       const reportLease = completeResearch(lease, result, historyItem.id)
+      operationRuntime.finish(lease)
       if (reportLease) await runReport(reportLease)
     } catch (error) {
-      failOperation(lease, toFailure('research', error))
+      finishWithError(lease, 'research', error)
+    } finally {
+      operationRuntime.finish(lease)
     }
   }
 
   async function runReport(lease: ResearchOperationLease) {
     const historyId = session.value.historyId
+    const signal = operationRuntime.start(lease, 'report')
     try {
       const report = await reportRef.value?.generateReport({
         input: lease.input,
         feedback: lease.feedback,
         result: lease.result,
         isCurrent: operationGuard(lease),
+        signal,
       })
       if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
       if (!report) throw new Error(t('researchSession.noReport'))
@@ -234,7 +255,9 @@
       }
       completeReport(lease, report)
     } catch (error) {
-      failOperation(lease, toFailure('report', error))
+      finishWithError(lease, 'report', error)
+    } finally {
+      operationRuntime.finish(lease)
     }
   }
 
@@ -242,12 +265,14 @@
     let historyId = session.value.historyId
     const lease = beginResearchRetry()
     if (!lease) return
+    const signal = operationRuntime.start(lease, 'research')
 
     try {
       const result = await deepResearchRef.value?.retryNode(nodeId, {
         input: lease.input,
         feedback: lease.feedback,
         isCurrent: operationGuard(lease),
+        signal,
       })
       if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
       if (!result?.learnings.length) throw new Error(t('researchSession.noLearnings'))
@@ -274,10 +299,24 @@
         }).id
       }
       const reportLease = completeResearch(lease, result, historyId)
+      operationRuntime.finish(lease)
       if (reportLease) await runReport(reportLease)
     } catch (error) {
-      failResearchRetry(lease)
+      if (isTimeoutError(error)) {
+        timeoutOperation(lease, 'research', t('researchSession.timeoutMessage'))
+      } else {
+        failResearchRetry(lease)
+      }
+    } finally {
+      operationRuntime.finish(lease)
     }
+  }
+
+  function cancelActiveOperation() {
+    const lease = operationRuntime.currentLease()
+    if (!lease || !requestCancellation(lease)) return
+    operationRuntime.cancel(lease)
+    completeCancellation(lease)
   }
 
   async function regenerateReport() {

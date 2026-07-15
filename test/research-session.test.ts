@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  canBeginFeedbackFromSession,
+  canRegenerateReportFromSession,
+  canRetryResearchFromSession,
   createInitialResearchSession,
   researchSessionReducer,
 } from '../app/composables/useResearchSession.ts'
@@ -8,6 +11,64 @@ import {
 const at = '2026-07-15T00:00:00.000Z'
 
 describe('research session reducer', () => {
+  it('keeps the research draft locked while awaiting feedback answers', () => {
+    assert.equal(canBeginFeedbackFromSession({ status: 'idle' }), true)
+    assert.equal(canBeginFeedbackFromSession({ status: 'awaiting-input' }), false)
+    assert.equal(canBeginFeedbackFromSession({ status: 'running' }), false)
+    assert.equal(canBeginFeedbackFromSession({ status: 'completed' }), true)
+  })
+
+  it('allows phase retries after cancellation and timeout', () => {
+    assert.equal(canRetryResearchFromSession({ status: 'timed-out', phase: 'research' }), true)
+    assert.equal(canRetryResearchFromSession({ status: 'cancelled', phase: 'report' }), true)
+    assert.equal(canRetryResearchFromSession({ status: 'cancelled', phase: 'feedback' }), false)
+    assert.equal(
+      canRegenerateReportFromSession({
+        status: 'timed-out',
+        phase: 'report',
+        historyId: 'history-1',
+        input: { query: 'topic', breadth: 2, depth: 2, numQuestions: 3 },
+        result: { learnings: [{ url: 'https://example.com', learning: 'Result' }] },
+      }),
+      true,
+    )
+  })
+
+  it('restores a timed-out state when a phase retry also fails', () => {
+    const timedOut = {
+      ...createInitialResearchSession(),
+      id: 'session-1',
+      status: 'timed-out' as const,
+      phase: 'research' as const,
+      input: { query: 'topic', breadth: 2, depth: 2, numQuestions: 3 },
+      failure: {
+        phase: 'research' as const,
+        code: 'upstream' as const,
+        message: 'Research timed out.',
+        retryable: true,
+      },
+    }
+    const retrying = researchSessionReducer(timedOut, {
+      type: 'BEGIN_RESEARCH_RETRY',
+      sessionId: 'session-1',
+      operationId: 'retry-1',
+      at,
+    })
+    const restored = researchSessionReducer(retrying, {
+      type: 'RESEARCH_RETRY_FAILED',
+      sessionId: 'session-1',
+      operationId: 'retry-1',
+      fallbackStatus: 'timed-out',
+      fallbackPhase: timedOut.phase,
+      fallbackFailure: timedOut.failure,
+      at,
+    })
+
+    assert.equal(retrying.status, 'running')
+    assert.equal(restored.status, 'timed-out')
+    assert.equal(restored.failure?.message, 'Research timed out.')
+  })
+
   it('freezes the input used by an active session', () => {
     const draft = { query: 'first', breadth: 2, depth: 3, numQuestions: 2 }
     const session = researchSessionReducer(createInitialResearchSession(), {
@@ -94,6 +155,70 @@ describe('research session reducer', () => {
 
     assert.equal(lateSuccess, failed)
     assert.equal(lateSuccess.status, 'failed')
+  })
+
+  it('cancels a running operation and rejects its late completion', () => {
+    const running = researchSessionReducer(createInitialResearchSession(), {
+      type: 'BEGIN_FEEDBACK',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      input: { query: 'topic', breadth: 2, depth: 2, numQuestions: 3 },
+      at,
+    })
+    const cancelling = researchSessionReducer(running, {
+      type: 'CANCEL_REQUESTED',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      at,
+    })
+    const cancelled = researchSessionReducer(cancelling, {
+      type: 'OPERATION_CANCELLED',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      at,
+    })
+    const lateSuccess = researchSessionReducer(cancelled, {
+      type: 'FEEDBACK_SUCCEEDED',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      feedback: [{ assistantQuestion: 'Question', userAnswer: '' }],
+      at,
+    })
+
+    assert.equal(cancelling.status, 'cancelling')
+    assert.equal(cancelled.status, 'cancelled')
+    assert.equal(cancelled.operationId, undefined)
+    assert.equal(lateSuccess, cancelled)
+  })
+
+  it('times out a running operation and rejects its late completion', () => {
+    const running = researchSessionReducer(createInitialResearchSession(), {
+      type: 'BEGIN_FEEDBACK',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      input: { query: 'topic', breadth: 2, depth: 2, numQuestions: 3 },
+      at,
+    })
+    const timedOut = researchSessionReducer(running, {
+      type: 'OPERATION_TIMED_OUT',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      phase: 'feedback',
+      message: 'Feedback timed out.',
+      at,
+    })
+    const lateSuccess = researchSessionReducer(timedOut, {
+      type: 'FEEDBACK_SUCCEEDED',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      feedback: [{ assistantQuestion: 'Question', userAnswer: '' }],
+      at,
+    })
+
+    assert.equal(timedOut.status, 'timed-out')
+    assert.equal(timedOut.operationId, undefined)
+    assert.equal(timedOut.failure?.message, 'Feedback timed out.')
+    assert.equal(lateSuccess, timedOut)
   })
 
   it('rejects history loading while an operation is running', () => {

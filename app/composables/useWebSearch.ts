@@ -1,10 +1,12 @@
 import { tavily } from '@tavily/core'
 import Firecrawl, { type Document, type SearchResultWeb } from '@mendable/firecrawl-js'
+import { abortable, isAbortError } from '~~/shared/utils/abort'
 
 type WebSearchOptions = {
   maxResults?: number
   /** The search language, e.g. `en`. Only works for Firecrawl. */
   lang?: string
+  signal?: AbortSignal
 }
 
 type WebSearchFunction = (query: string, options: WebSearchOptions) => Promise<WebSearchResult[]>
@@ -25,12 +27,15 @@ export const useWebSearch = (): WebSearchFunction => {
         // v2 SDK: `search` throws on error and returns results grouped by
         // source (`web`/`news`/`images`) instead of the old flat `data` array.
         // `maxResults` was renamed to `limit`.
-        const results = await fc.search(q, {
-          limit: o.maxResults,
-          scrapeOptions: {
-            formats: ['markdown'],
-          },
-        })
+        const results = await abortable(
+          fc.search(q, {
+            limit: o.maxResults,
+            scrapeOptions: {
+              formats: ['markdown'],
+            },
+          }),
+          o.signal,
+        )
         // With `scrapeOptions`, web results are scraped `Document`s carrying
         // `markdown` plus top-level `url`/`title` (and a `metadata` fallback).
         return (results.web ?? [])
@@ -71,6 +76,7 @@ export const useWebSearch = (): WebSearchFunction => {
             items?: Array<{ title: string; link: string; snippet: string }>
           }>(apiUrl, {
             method: 'GET',
+            signal: o.signal,
           })
 
           if (!response.items) {
@@ -84,6 +90,7 @@ export const useWebSearch = (): WebSearchFunction => {
             title: item.title,
           }))
         } catch (error: any) {
+          if (o.signal?.aborted || isAbortError(error)) throw error
           console.error('Google PSE search failed:', error)
           // Attempt to parse Google API error format
           const errorMessage = error?.data?.error?.message || error.message || 'Unknown error'
@@ -97,11 +104,15 @@ export const useWebSearch = (): WebSearchFunction => {
         apiKey: config.webSearch.apiKey,
       })
       return async (q: string, o: WebSearchOptions) => {
-        const results = await tvly.search(q, {
-          ...o,
-          searchDepth: config.webSearch.tavilyAdvancedSearch ? 'advanced' : 'basic',
-          topic: config.webSearch.tavilySearchTopic,
-        })
+        const { signal, ...searchOptions } = o
+        const results = await abortable(
+          tvly.search(q, {
+            ...searchOptions,
+            searchDepth: config.webSearch.tavilyAdvancedSearch ? 'advanced' : 'basic',
+            topic: config.webSearch.tavilySearchTopic,
+          }),
+          signal,
+        )
         return results.results
           .filter((x) => !!x?.content && !!x.url)
           .map((r) => ({

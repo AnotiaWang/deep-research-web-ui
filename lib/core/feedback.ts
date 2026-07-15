@@ -6,6 +6,7 @@ import { languagePrompt, systemPrompt } from '../prompt'
 import { parseStreamingJson, type DeepPartial } from '~~/shared/utils/json'
 import { throwAiError } from '~~/shared/utils/errors'
 import { getLanguageModel } from '~~/shared/utils/ai-model'
+import { throwIfAborted } from '~~/shared/utils/abort'
 
 type PartialFeedback = DeepPartial<z.infer<typeof feedbackTypeSchema>>
 
@@ -18,12 +19,15 @@ export function generateFeedback({
   language,
   numQuestions = 3,
   aiConfig,
+  signal,
 }: {
   query: string
   language: string
   aiConfig: ConfigAi
   numQuestions?: number
+  signal?: AbortSignal
 }) {
+  throwIfAborted(signal)
   const schema = z.object({
     questions: z
       .array(z.string())
@@ -41,6 +45,7 @@ export function generateFeedback({
     model: getLanguageModel(aiConfig),
     system: systemPrompt(),
     prompt,
+    abortSignal: signal,
     onError({ error }) {
       throwAiError('generateFeedback', error)
     },

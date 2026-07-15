@@ -30,9 +30,14 @@ export default defineEventHandler(async (event) => {
   setHeader(event, 'Cache-Control', 'no-cache')
   setHeader(event, 'Connection', 'keep-alive')
 
+  const requestAbort = createRequestAbort(
+    event,
+    serverOperationTimeout(runtimeConfig.public.researchReportTimeoutMs),
+  )
+
   const stream = new ReadableStream({
     async start(controller) {
-      const encoder = new TextEncoder()
+      const writer = createSSEWriter(controller, requestAbort.canWrite)
 
       try {
         const reportGenerator = writeFinalReport({
@@ -40,24 +45,33 @@ export default defineEventHandler(async (event) => {
           learnings,
           language,
           aiConfig: serverConfig,
+          signal: requestAbort.signal,
         })
 
         for await (const chunk of reportGenerator.fullStream) {
+          if (requestAbort.signal.aborted) break
           const serializableChunk =
             chunk.type === 'error' ? { type: 'error', error: getStreamErrorMessage(chunk) } : chunk
-          const data = `data: ${JSON.stringify(serializableChunk)}\n\n`
-          controller.enqueue(encoder.encode(data))
+          writer.write(serializableChunk)
         }
-
-        controller.close()
       } catch (error: any) {
-        const errorData = `data: ${JSON.stringify({
-          type: 'error',
-          error: getStreamErrorMessage({ error }),
-        })}\n\n`
-        controller.enqueue(encoder.encode(errorData))
-        controller.close()
+        if (!requestAbort.signal.aborted) {
+          writer.write({ type: 'error', error: getStreamErrorMessage({ error }) })
+        }
+      } finally {
+        if (requestAbort.reason() === 'timeout') {
+          writer.write({
+            type: 'error',
+            code: 'timeout',
+            error: 'The report request timed out.',
+          })
+        }
+        requestAbort.cleanup()
+        writer.close()
       }
+    },
+    cancel() {
+      requestAbort.abort('stream-cancel')
     },
   })
 

@@ -10,6 +10,7 @@
   export interface GetFeedbackOptions {
     input: ResearchInputSnapshot
     isCurrent: () => boolean
+    signal?: AbortSignal
   }
 
   const props = defineProps<{
@@ -72,6 +73,7 @@
         numQuestions: input.numQuestions,
         language: t('language', {}, { locale: locale.value }),
         aiConfig: config.value.ai,
+        signal: options?.signal,
       })
 
       for await (const chunk of chunks) {

@@ -4,6 +4,7 @@ import type { ConfigAi, ConfigWebSearch } from '~~/shared/types/config'
 import type { RuntimeConfig } from 'nuxt/schema'
 import fs from 'node:fs'
 import path from 'node:path'
+import { abortable, isAbortError } from '~~/shared/utils/abort'
 
 // --- ApiKeyPool with File-based State Persistence ---
 
@@ -166,38 +167,60 @@ export default defineEventHandler(async (event) => {
   setHeader(event, 'Cache-Control', 'no-cache')
   setHeader(event, 'Connection', 'keep-alive')
 
+  const requestAbort = createRequestAbort(
+    event,
+    serverOperationTimeout(runtimeConfig.public.researchResearchTimeoutMs),
+  )
+
   const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder()
+    async start(controller) {
+      const writer = createSSEWriter(controller, requestAbort.canWrite)
 
       const onProgress = (step: any) => {
-        const data = `data: ${JSON.stringify(step)}\n\n`
-        controller.enqueue(encoder.encode(data))
+        if (requestAbort.signal.aborted) return
+        writer.write(step)
       }
 
-      deepResearch({
-        query,
-        breadth,
-        maxDepth: depth,
-        languageCode,
-        aiConfig: serverConfig,
-        searchLanguageCode,
-        learnings,
-        currentDepth,
-        nodeId,
-        retryNode,
-        onProgress,
-        webSearchFunction: serverWebSearch,
-        pLimitInstance: serverPLimit,
-      })
-        .then((result) => {
-          controller.close()
+      try {
+        await deepResearch({
+          query,
+          breadth,
+          maxDepth: depth,
+          languageCode,
+          aiConfig: serverConfig,
+          searchLanguageCode,
+          learnings,
+          currentDepth,
+          nodeId,
+          retryNode,
+          onProgress,
+          webSearchFunction: serverWebSearch,
+          pLimitInstance: serverPLimit,
+          signal: requestAbort.signal,
         })
-        .catch((error) => {
-          const errorData = `data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`
-          controller.enqueue(encoder.encode(errorData))
-          controller.close()
-        })
+      } catch (error) {
+        if (!requestAbort.signal.aborted) {
+          writer.write({
+            type: 'error',
+            message: error instanceof Error ? error.message : String(error),
+            nodeId,
+          })
+        }
+      } finally {
+        if (requestAbort.reason() === 'timeout') {
+          writer.write({
+            type: 'error',
+            code: 'timeout',
+            message: 'The research request timed out.',
+            nodeId,
+          })
+        }
+        requestAbort.cleanup()
+        writer.close()
+      }
+    },
+    cancel() {
+      requestAbort.abort('stream-cancel')
     },
   })
 
@@ -209,7 +232,10 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
   const { tavily } = await import('@tavily/core')
   const { default: Firecrawl } = await import('@mendable/firecrawl-js')
 
-  return async (query: string, options: { maxResults?: number; lang?: string }) => {
+  return async (
+    query: string,
+    options: { maxResults?: number; lang?: string; signal?: AbortSignal },
+  ) => {
     const provider = runtimeConfig.public.webSearchProvider
     const apiKey = runtimeConfig.webSearchApiKey
     const apiBase = runtimeConfig.webSearchApiBase
@@ -222,12 +248,15 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
         })
         // v2 SDK: `search` throws on error and returns results grouped by
         // source (`web`/`news`/`images`); `maxResults` was renamed to `limit`.
-        const results = await fc.search(query, {
-          limit: options.maxResults || 5,
-          scrapeOptions: {
-            formats: ['markdown'],
-          },
-        })
+        const results = await abortable(
+          fc.search(query, {
+            limit: options.maxResults || 5,
+            scrapeOptions: {
+              formats: ['markdown'],
+            },
+          }),
+          options.signal,
+        )
         return (results.web ?? [])
           .filter((x: any) => !!x?.markdown && !!(x.url ?? x.metadata?.sourceURL))
           .map((r: any) => ({
@@ -244,12 +273,15 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
           apiKey,
           apiUrl: apiBase || 'https://fastcrw.com/api',
         })
-        const results = await fc.search(query, {
-          limit: options.maxResults || 5,
-          scrapeOptions: {
-            formats: ['markdown'],
-          },
-        })
+        const results = await abortable(
+          fc.search(query, {
+            limit: options.maxResults || 5,
+            scrapeOptions: {
+              formats: ['markdown'],
+            },
+          }),
+          options.signal,
+        )
         return (results.web ?? [])
           .filter((x: any) => !!x?.markdown && !!(x.url ?? x.metadata?.sourceURL))
           .map((r: any) => ({
@@ -300,7 +332,10 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
           }
 
           const apiUrl = `https://www.googleapis.com/customsearch/v1?${searchParams.toString()}`
-          const response = (await $fetch(apiUrl, { method: 'GET' })) as any
+          const response = (await $fetch(apiUrl, {
+            method: 'GET',
+            signal: options.signal,
+          })) as any
 
           if (!response.items) {
             googleApiKeyPool.markKeySuccess(currentApiKey)
@@ -314,6 +349,7 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
             title: item.title,
           }))
         } catch (e) {
+          if (options.signal?.aborted || isAbortError(e)) throw e
           googleApiKeyPool.markKeyError(currentApiKey)
           throw e
         }
@@ -348,11 +384,14 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
           const tvly = tavily({
             apiKey: currentApiKey,
           })
-          const results = await tvly.search(query, {
-            maxResults: options.maxResults || 5,
-            searchDepth: runtimeConfig.public.tavilyAdvancedSearch ? 'advanced' : 'basic',
-            topic: runtimeConfig.public.tavilySearchTopic as ConfigWebSearch['tavilySearchTopic'],
-          })
+          const results = await abortable(
+            tvly.search(query, {
+              maxResults: options.maxResults || 5,
+              searchDepth: runtimeConfig.public.tavilyAdvancedSearch ? 'advanced' : 'basic',
+              topic: runtimeConfig.public.tavilySearchTopic as ConfigWebSearch['tavilySearchTopic'],
+            }),
+            options.signal,
+          )
           apiKeyPool.markKeySuccess(currentApiKey)
           return results.results
             .filter((x: any) => !!x?.content && !!x.url)
@@ -362,6 +401,7 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
               title: r.title,
             }))
         } catch (e) {
+          if (options.signal?.aborted || isAbortError(e)) throw e
           apiKeyPool.markKeyError(currentApiKey)
           throw e
         }

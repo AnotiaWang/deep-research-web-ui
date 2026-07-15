@@ -1,6 +1,11 @@
 import { fileURLToPath } from 'node:url'
 import { version as projVersion } from './public/version.json'
 
+function positiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number.parseInt(value ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
@@ -25,6 +30,18 @@ export default defineNuxtConfig({
       tavilyAdvancedSearch: process.env.NUXT_PUBLIC_TAVILY_ADVANCED_SEARCH === 'true',
       tavilySearchTopic: process.env.NUXT_PUBLIC_TAVILY_SEARCH_TOPIC || 'general',
       googlePseId: process.env.NUXT_PUBLIC_GOOGLE_PSE_ID,
+      researchFeedbackTimeoutMs: positiveInteger(
+        process.env.NUXT_PUBLIC_RESEARCH_FEEDBACK_TIMEOUT_MS,
+        120_000,
+      ),
+      researchResearchTimeoutMs: positiveInteger(
+        process.env.NUXT_PUBLIC_RESEARCH_RESEARCH_TIMEOUT_MS,
+        900_000,
+      ),
+      researchReportTimeoutMs: positiveInteger(
+        process.env.NUXT_PUBLIC_RESEARCH_REPORT_TIMEOUT_MS,
+        300_000,
+      ),
     },
     // Private server-only configuration
     aiApiKey: process.env.NUXT_AI_API_KEY,
