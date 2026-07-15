@@ -91,6 +91,9 @@ export default defineNuxtConfig({
 
   nitro: {
     compressPublicAssets: { brotli: true, gzip: true },
+    // Nitro 2.12 follows pnpm peer-dependency symlinks while printing the output tree.
+    // Keep errors visible while skipping that non-essential post-build traversal.
+    logLevel: 1,
   },
 
   typescript: {

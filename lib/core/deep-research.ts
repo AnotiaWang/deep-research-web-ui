@@ -7,6 +7,7 @@ import { languagePrompt, systemPrompt } from '../prompt'
 import zodToJsonSchema from 'zod-to-json-schema'
 import { throwAiError } from '~~/shared/utils/errors'
 import type { ResearchResult } from '~~/shared/types/research-session'
+import { normalizeGeneratedSearchQueries } from '~~/shared/utils/search-query'
 
 export type { ResearchResult } from '~~/shared/types/research-session'
 
@@ -236,10 +237,6 @@ ${learning.learning}
   })
 }
 
-function childNodeId(parentNodeId: string, currentIndex: number) {
-  return `${parentNodeId}-${currentIndex}`
-}
-
 export async function deepResearch({
   query,
   breadth,
@@ -320,15 +317,7 @@ export async function deepResearch({
         (value) => !!value.queries?.length && !!value.queries[0]?.query,
       )) {
         if (chunk.type === 'object' && chunk.value.queries) {
-          // Temporary fix: Exclude queries that equals `undefined`
-          // Currently only being reported to be seen on GPT-4o, where the model simply returns `undefined` for certain questions
-          // https://github.com/AnotiaWang/deep-research-web-ui/issues/7
-          searchQueries = chunk.value.queries
-            .filter((q) => q.query !== 'undefined')
-            .map((q, i) => ({
-              ...q,
-              nodeId: childNodeId(nodeId, i),
-            }))
+          searchQueries = normalizeGeneratedSearchQueries(chunk.value.queries, nodeId)
           for (let i = 0; i < searchQueries.length; i++) {
             onProgress({
               type: 'generating_query',
