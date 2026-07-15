@@ -16,7 +16,10 @@ describe('RecursiveCharacterTextSplitter', () => {
     const text = 'Hello world, this is a test of the recursive text splitter.'
 
     // Test with initial chunkSize
-    assert.deepEqual(splitter.splitText(text), ['Hello world', 'this is a test of the recursive text splitter'])
+    assert.deepEqual(splitter.splitText(text), [
+      'Hello world',
+      'this is a test of the recursive text splitter',
+    ])
 
     // Test with updated chunkSize
     splitter.chunkSize = 100
@@ -54,12 +57,21 @@ describe('RecursiveCharacterTextSplitter', () => {
     assert.deepEqual(splitter.splitText(largeText), Array(5).fill('A'.repeat(200)))
 
     const specialCharText = 'Hello!@# world$%^ &*( this) is+ a-test'
-    assert.deepEqual(splitter.splitText(specialCharText), ['Hello!@#', 'world$%^', '&*( this)', 'is+', 'a-test'])
+    assert.deepEqual(splitter.splitText(specialCharText), [
+      'Hello!@#',
+      'world$%^',
+      '&*( this)',
+      'is+',
+      'a-test',
+    ])
   })
 
   it('Should handle chunkSize equal to chunkOverlap', () => {
     splitter.chunkSize = 50
     splitter.chunkOverlap = 50
-    assert.throws(() => splitter.splitText('Invalid configuration'), new Error('Cannot have chunkOverlap >= chunkSize'))
+    assert.throws(
+      () => splitter.splitText('Invalid configuration'),
+      new Error('Cannot have chunkOverlap >= chunkSize'),
+    )
   })
 })

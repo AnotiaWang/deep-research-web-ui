@@ -1,7 +1,7 @@
 import { deepResearch } from '~~/lib/core/deep-research'
 import pLimit from 'p-limit'
 import type { ConfigAi, ConfigWebSearch } from '~~/shared/types/config'
-import { RuntimeConfig } from 'nuxt/schema'
+import type { RuntimeConfig } from 'nuxt/schema'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -37,7 +37,10 @@ class ApiKeyPool {
     const envKeySet = new Set(keys)
     const stateKeySet = new Set(this.state.keys.map((k) => k.key))
 
-    if (this.state.keys.length !== keys.length || ![...envKeySet].every((k) => stateKeySet.has(k))) {
+    if (
+      this.state.keys.length !== keys.length ||
+      ![...envKeySet].every((k) => stateKeySet.has(k))
+    ) {
       this.state = {
         currentIndex: 0,
         keys: keys.map((key) => ({
@@ -70,7 +73,10 @@ class ApiKeyPool {
     try {
       fs.writeFileSync(this.cacheFilePath, JSON.stringify(this.state, null, 2))
     } catch (error: any) {
-      console.error(`[ApiKeyPool] Error: Could not write to cache file for ${this.cacheFilePath}.`, error.message)
+      console.error(
+        `[ApiKeyPool] Error: Could not write to cache file for ${this.cacheFilePath}.`,
+        error.message,
+      )
     }
   }
 
@@ -82,7 +88,7 @@ class ApiKeyPool {
     if (this.state.currentIndex >= activeKeys.length) {
       this.state.currentIndex = 0
     }
-    const keyConfig = activeKeys[this.state.currentIndex]
+    const keyConfig = activeKeys[this.state.currentIndex]!
     this.state.currentIndex = (this.state.currentIndex + 1) % activeKeys.length
     this.saveState()
     return keyConfig
@@ -94,7 +100,9 @@ class ApiKeyPool {
       keyConfig.errorCount++
       if (keyConfig.errorCount >= keyConfig.maxErrors) {
         keyConfig.active = false
-        console.error(`[ApiKeyPool] Disabling key due to multiple errors: ${key.substring(0, 8)}...`)
+        console.error(
+          `[ApiKeyPool] Disabling key due to multiple errors: ${key.substring(0, 8)}...`,
+        )
       }
       this.saveState()
     }
@@ -267,7 +275,9 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
             .map((key: string) => key.trim())
             .filter((key: string) => key)
           if (keys.length === 0) {
-            throw new Error('NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.')
+            throw new Error(
+              'NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.',
+            )
           }
           googleApiKeyPool = new ApiKeyPool(keys, 'google-pse')
         }
@@ -321,7 +331,9 @@ async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
             .map((key: string) => key.trim())
             .filter((key: string) => key)
           if (keys.length === 0) {
-            throw new Error('NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.')
+            throw new Error(
+              'NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.',
+            )
           }
           apiKeyPool = new ApiKeyPool(keys, 'tavily')
         }

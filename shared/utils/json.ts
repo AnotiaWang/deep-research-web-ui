@@ -2,7 +2,11 @@ import { parsePartialJson } from '@ai-sdk/ui-utils'
 import type { TextStreamPart } from 'ai'
 import { z } from 'zod'
 
-export type DeepPartial<T> = T extends object ? (T extends Array<any> ? T : { [P in keyof T]?: DeepPartial<T[P]> }) : T
+export type DeepPartial<T> = T extends object
+  ? T extends Array<any>
+    ? T
+    : { [P in keyof T]?: DeepPartial<T[P]> }
+  : T
 
 export type ParseStreamingJsonEvent<T> =
   | { type: 'object'; value: DeepPartial<T> }

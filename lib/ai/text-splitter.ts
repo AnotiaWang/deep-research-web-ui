@@ -80,7 +80,10 @@ export interface RecursiveCharacterTextSplitterParams extends TextSplitterParams
   separators: string[]
 }
 
-export class RecursiveCharacterTextSplitter extends TextSplitter implements RecursiveCharacterTextSplitterParams {
+export class RecursiveCharacterTextSplitter
+  extends TextSplitter
+  implements RecursiveCharacterTextSplitterParams
+{
   separators: string[] = ['\n\n', '\n', '.', ',', '>', '<', ' ', '']
 
   constructor(fields?: Partial<RecursiveCharacterTextSplitterParams>) {

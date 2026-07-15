@@ -25,7 +25,9 @@ export function generateFeedback({
   numQuestions?: number
 }) {
   const schema = z.object({
-    questions: z.array(z.string()).describe(`Follow up questions to clarify the research direction`),
+    questions: z
+      .array(z.string())
+      .describe(`Follow up questions to clarify the research direction`),
   })
   const jsonSchema = JSON.stringify(zodToJsonSchema(schema))
   const prompt = [

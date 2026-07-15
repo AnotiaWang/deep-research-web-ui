@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { wrapLanguageModel, extractReasoningMiddleware } from 'ai'
 import type { LanguageModelV1 } from 'ai'
+import type { ConfigAi } from '../types/config'
 
 export function getLanguageModel(config: ConfigAi) {
   const apiBase = getApiBase(config)

@@ -48,7 +48,14 @@
           <template #help>
             {{ $t('researchTopic.numOfQuestionsHelp') }}
           </template>
-          <UInput v-model="form.numQuestions" class="w-full" type="number" :min="1" :max="5" :step="1" />
+          <UInput
+            v-model="form.numQuestions"
+            class="w-full"
+            type="number"
+            :min="1"
+            :max="5"
+            :step="1"
+          />
         </UFormField>
 
         <UFormField :label="$t('researchTopic.depth')" required>

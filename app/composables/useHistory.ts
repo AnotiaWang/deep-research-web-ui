@@ -51,7 +51,9 @@ export const useHistory = () => {
           const importedItem = JSON.parse(e.target?.result as string) as ResearchHistoryItem
           if (importedItem && importedItem.id && importedItem.query) {
             // 检查是否已存在相同ID
-            const existingIndex = history.value.items.findIndex((item) => item.id === importedItem.id)
+            const existingIndex = history.value.items.findIndex(
+              (item) => item.id === importedItem.id,
+            )
             if (existingIndex >= 0) {
               // 更新现有记录
               history.value.items[existingIndex] = {

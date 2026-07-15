@@ -4,12 +4,15 @@
 
   const { t } = useI18n()
   const toast = useToast()
-  const { history, removeHistoryItem, exportHistoryItem, importHistoryItem, clearHistory } = useHistory()
+  const { history, removeHistoryItem, exportHistoryItem, importHistoryItem, clearHistory } =
+    useHistory()
   const showModal = ref(false)
   const loading = ref(false)
 
   const sortedHistory = computed(() =>
-    [...history.value.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [...history.value.items].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    ),
   )
 
   const fileInput = ref<HTMLInputElement>()
@@ -114,10 +117,22 @@
         <!-- 导入按钮和删除全部 -->
         <div class="flex gap-2 justify-between items-center">
           <div class="flex gap-2">
-            <UButton color="info" variant="soft" icon="i-lucide-upload" @click="handleImport" :loading="loading">
+            <UButton
+              color="info"
+              variant="soft"
+              icon="i-lucide-upload"
+              @click="handleImport"
+              :loading="loading"
+            >
               {{ t('history.import') }}
             </UButton>
-            <input ref="fileInput" type="file" accept=".json" class="hidden" @change="handleFileSelect" />
+            <input
+              ref="fileInput"
+              type="file"
+              accept=".json"
+              class="hidden"
+              @change="handleFileSelect"
+            />
           </div>
 
           <UButton

@@ -12,7 +12,8 @@
     "postinstall": "nuxt prepare",
     "format": "prettier --write app server lib shared",
     "lint": "prettier --check app server lib shared",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^0.1.16",
@@ -50,6 +51,8 @@
   "devDependencies": {
     "@vueuse/core": "^13.0.0",
     "@vueuse/nuxt": "^13.0.0",
-    "prettier": "^3.5.3"
+    "prettier": "^3.5.3",
+    "typescript": "5.8.3",
+    "vue-tsc": "3.0.4"
   }
 }

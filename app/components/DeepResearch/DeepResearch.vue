@@ -5,7 +5,11 @@
     type ProcessedSearchResult,
     type ResearchStep,
   } from '~~/lib/core/deep-research'
-  import { feedbackInjectionKey, formInjectionKey, researchResultInjectionKey } from '~/constants/injection-keys'
+  import {
+    feedbackInjectionKey,
+    formInjectionKey,
+    researchResultInjectionKey,
+  } from '~/constants/injection-keys'
   import Flow, { type SearchNode, type SearchEdge } from './SearchFlow.vue'
   import SearchFlow from './SearchFlow.vue'
   import NodeDetail from './NodeDetail.vue'
@@ -339,7 +343,12 @@
           </p>
         </div>
         <UTooltip :text="t('exitFullscreen')" :delay-duration="100">
-          <UButton icon="i-material-symbols:fullscreen-exit" variant="ghost" color="info" @click="toggleFullscreen" />
+          <UButton
+            icon="i-material-symbols:fullscreen-exit"
+            variant="ghost"
+            color="info"
+            @click="toggleFullscreen"
+          />
         </UTooltip>
       </div>
     </template>
@@ -381,7 +390,12 @@
           </p>
         </div>
         <UTooltip :text="t('fullscreen')" :delay-duration="100">
-          <UButton icon="i-material-symbols:fullscreen" variant="ghost" color="info" @click="toggleFullscreen" />
+          <UButton
+            icon="i-material-symbols:fullscreen"
+            variant="ghost"
+            color="info"
+            @click="toggleFullscreen"
+          />
         </UTooltip>
       </div>
     </template>
