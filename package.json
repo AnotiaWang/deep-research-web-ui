@@ -11,7 +11,8 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "format": "prettier --write app server lib shared",
-    "lint": "prettier --check app server lib shared"
+    "lint": "prettier --check app server lib shared",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^0.1.16",
@@ -32,6 +33,7 @@
     "@vue-flow/controls": "^1.1.2",
     "@vue-flow/core": "^1.45.0",
     "ai": "^4.1.63",
+    "dompurify": "^3.4.12",
     "js-tiktoken": "^1.0.19",
     "marked": "^15.0.7",
     "nuxt": "^4.0.3",

@@ -1,7 +1,11 @@
 <script setup lang="ts">
-  import { marked } from 'marked'
-  import { feedbackInjectionKey, formInjectionKey, researchResultInjectionKey } from '~/constants/injection-keys'
+  import {
+    feedbackInjectionKey,
+    formInjectionKey,
+    researchResultInjectionKey,
+  } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
+  import { createCitationHtml, renderSafeMarkdown } from '~/utils/markdown'
 
   const { t, locale } = useI18n()
   const { config } = storeToRefs(useConfigStore())
@@ -22,48 +26,26 @@
   const researchResult = inject(researchResultInjectionKey)!
 
   const isExportButtonDisabled = computed(
-    () => !reportContent.value || loading.value || loadingExportPdf.value || loadingExportMarkdown.value,
+    () =>
+      !reportContent.value ||
+      loading.value ||
+      loadingExportPdf.value ||
+      loadingExportMarkdown.value,
   )
 
   const reportHtml = computed(() => {
-    let html = marked(reportContent.value, {
-      silent: true,
-      gfm: true,
-      breaks: true,
-      async: false,
-    })
-
     const learnings = researchResult.value?.learnings ?? []
+    const markdownWithCitations = reportContent.value.replace(
+      /\[(\d+)\](?!\()/g,
+      (match, number) => {
+        const index = parseInt(number) - 1
+        const learning = index >= 0 && index < learnings.length ? learnings[index] : ''
+        if (!learning) return match
+        return createCitationHtml(match, learning.url, learning.title || learning.url)
+      },
+    )
 
-    // 替换引用标记 [数字] 为带有工具提示的 span
-    html = html.replace(/\[(\d+)\]/g, (match, number) => {
-      const index = parseInt(number) - 1
-      const learning = index >= 0 && index < learnings.length ? learnings[index] : ''
-      if (!learning) return match
-      // 使用唯一的 ID 来标识每个 tooltip
-      const tooltipId = `tooltip-${index}`
-
-      return `<span class="citation-ref" data-tooltip-id="${tooltipId}" data-tooltip-url="${
-        learning.url
-      }" data-tooltip-content="${encodeURIComponent(learning.title || learning.url)}">
-        <a href="${learning.url}" target="_blank">${match}</a>
-      </span>`
-    })
-
-    return `<style>
-        .citation-ref {
-          display: inline-block;
-          vertical-align: super;
-          font-size: 0.75rem;
-          font-weight: 500;
-          color: #3b82f6;
-        }
-        .citation-ref a {
-          text-decoration: none;
-          color: inherit;
-        }
-      </style>
-      ${html}`
+    return renderSafeMarkdown(markdownWithCitations)
   })
 
   // 在 DOM 更新后设置 tooltip 事件监听
@@ -80,25 +62,34 @@
     })
   })
 
+  let tooltipElement: HTMLElement | undefined
+
+  function removeTooltip() {
+    tooltipElement?.remove()
+    tooltipElement = undefined
+  }
+
+  onUnmounted(removeTooltip)
+
   // 设置 tooltip 事件监听
   function setupTooltips() {
     if (!reportContainerRef.value) return
 
-    // 移除现有的 tooltip 元素
-    document.querySelectorAll('.citation-tooltip').forEach((el) => el.remove())
+    removeTooltip()
 
     // 创建一个通用的 tooltip 元素
     const tooltip = document.createElement('div')
+    tooltipElement = tooltip
     tooltip.className =
       'citation-tooltip fixed px-2 py-1 bg-gray-800 text-white text-xs rounded z-50 opacity-0 transition-opacity duration-200 max-w-[calc(100vw-2rem)] overflow-hidden text-ellipsis pointer-events-none'
     document.body.appendChild(tooltip)
 
     // 为所有引用添加鼠标事件
-    const refs = reportContainerRef.value.querySelectorAll('.citation-ref')
+    const refs = reportContainerRef.value.querySelectorAll('.citation-ref a')
     refs.forEach((ref) => {
       ref.addEventListener('mouseenter', (e) => {
         const target = e.currentTarget as HTMLElement
-        const content = decodeURIComponent(target.dataset.tooltipContent || '')
+        const content = target.title
 
         // 设置 tooltip 内容
         tooltip.textContent = content
@@ -149,6 +140,7 @@
         learnings,
         aiConfig: config.value.ai,
       })
+      let streamFailed = false
       for await (const chunk of fullStream) {
         if (chunk.type === 'reasoning') {
           reasoningContent.value += chunk.textDelta
@@ -158,8 +150,12 @@
           error.value = t('researchReport.generateFailed', [
             chunk.error instanceof Error ? chunk.error.message : String(chunk.error),
           ])
+          streamFailed = true
+          break
         }
       }
+      if (streamFailed) return
+
       reportContent.value += `\n\n## ${t('researchReport.sources')}\n\n${learnings
         .map((item, index) => `${index + 1}. [${item.title || item.url}](${item.url})`)
         .join('\n')}`
@@ -275,7 +271,7 @@
       </div>
     </template>
 
-    <UAlert v-if="error" :title="$t('researchReport.exportFailed')" :description="error" color="error" variant="soft" />
+    <UAlert v-if="error" :title="error" color="error" variant="soft" />
 
     <div class="flex mb-4 justify-end">
       <UButton
@@ -302,7 +298,12 @@
       </UButton>
     </div>
 
-    <ReasoningAccordion v-if="reasoningContent" v-model="reasoningContent" class="mb-4" :loading="loading" />
+    <ReasoningAccordion
+      v-if="reasoningContent"
+      v-model="reasoningContent"
+      class="mb-4"
+      :loading="loading"
+    />
 
     <div
       ref="reportContainerRef"
@@ -315,3 +316,18 @@
     </div>
   </UCard>
 </template>
+
+<style scoped>
+  :deep(.citation-ref) {
+    display: inline-block;
+    vertical-align: super;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #3b82f6;
+  }
+
+  :deep(.citation-ref a) {
+    color: inherit;
+    text-decoration: none;
+  }
+</style>

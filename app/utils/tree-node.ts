@@ -1,9 +1,9 @@
 export function isChildNode(parentId: string, childId: string) {
-  return childId.length > parentId.length && childId.startsWith(parentId)
+  return childId.startsWith(`${parentId}-`)
 }
 
 export function isParentNode(parentId: string, childId: string) {
-  return childId.length < parentId.length && childId.startsWith(parentId)
+  return isChildNode(parentId, childId)
 }
 
 export function isRootNode(nodeId: string) {
@@ -11,7 +11,9 @@ export function isRootNode(nodeId: string) {
 }
 
 export function parentNodeId(nodeId: string) {
-  return nodeId.split('-').shift()
+  const segments = nodeId.split('-')
+  if (segments.length === 1) return undefined
+  return segments.slice(0, -1).join('-')
 }
 
 export function nodeIndex(nodeId: string) {

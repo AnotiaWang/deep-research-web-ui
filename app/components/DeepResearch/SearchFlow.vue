@@ -3,10 +3,18 @@
   import '@vue-flow/core/dist/theme-default.css'
   import '@vue-flow/controls/dist/style.css'
   import SearchNode from './SearchNode.vue'
-  import { type Edge, type FlowEvents, type Node, VueFlow, useVueFlow, getNodesInside } from '@vue-flow/core'
+  import {
+    type Edge,
+    type FlowEvents,
+    type Node,
+    VueFlow,
+    useVueFlow,
+    getNodesInside,
+  } from '@vue-flow/core'
   import { Background } from '@vue-flow/background'
   import { Controls } from '@vue-flow/controls'
   import type { DeepResearchNodeStatus } from './DeepResearch.vue'
+  import { isChildNode } from '~/utils/tree-node'
 
   export interface SearchNodeData {
     title: string
@@ -98,10 +106,6 @@
   function reset() {
     layoutGraph()
     hasUserInteraction = false
-  }
-
-  function isChildNode(parentId: string, childId: string) {
-    return childId.length > parentId.length && childId.startsWith(parentId)
   }
 
   function removeChildNodes(parentId: string) {
