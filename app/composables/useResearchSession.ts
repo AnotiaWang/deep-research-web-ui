@@ -221,7 +221,6 @@ export function researchSessionReducer(
       if (
         state.id !== event.sessionId ||
         !state.input ||
-        !state.historyId ||
         !(
           state.status === 'completed' ||
           (state.status === 'failed' && (state.phase === 'research' || state.phase === 'report'))

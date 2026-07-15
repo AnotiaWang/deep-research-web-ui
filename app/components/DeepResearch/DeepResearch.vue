@@ -236,6 +236,33 @@
     }
   }
 
+  interface ResearchGraphSnapshot {
+    nodes: DeepResearchNode[]
+    selectedNodeId: string | undefined
+    searchResults: Record<string, PartialProcessedSearchResult>
+    flowNodes: SearchNode[]
+    flowEdges: SearchEdge[]
+  }
+
+  function snapshotResearchGraph(): ResearchGraphSnapshot {
+    return structuredClone({
+      nodes: toRaw(nodes.value),
+      selectedNodeId: selectedNodeId.value,
+      searchResults: toRaw(searchResults.value),
+      flowNodes: toRaw(flowNodes.value),
+      flowEdges: toRaw(flowEdges.value),
+    })
+  }
+
+  function restoreResearchGraph(snapshot: ResearchGraphSnapshot) {
+    nodes.value = snapshot.nodes
+    selectedNodeId.value = snapshot.selectedNodeId
+    searchResults.value = snapshot.searchResults
+    flowNodes.value = snapshot.flowNodes
+    flowEdges.value = snapshot.flowEdges
+    nextTick(() => flowRef.value?.reset())
+  }
+
   let activeResearch = 0
 
   async function startResearch(options?: StartResearchOptions, retryNode?: DeepResearchNode) {
@@ -321,6 +348,8 @@
     console.log('[DeepResearch] retryNode', nodeId, isLoading.value)
     if (!nodeId || isLoading.value || (props.disabled && !options)) return
 
+    const graphSnapshot = snapshotResearchGraph()
+
     // Remove all child nodes first
     nodes.value = nodes.value.filter((n) => !isChildNode(nodeId, n.id))
     flowRef.value?.removeChildNodes(nodeId)
@@ -348,7 +377,14 @@
       })
     }
 
-    return startResearch(options, nodeCurrentData)
+    try {
+      const result = await startResearch(options, nodeCurrentData)
+      if (!result?.learnings.length) restoreResearchGraph(graphSnapshot)
+      return result
+    } catch (error) {
+      restoreResearchGraph(graphSnapshot)
+      throw error
+    }
   }
 
   function clear() {

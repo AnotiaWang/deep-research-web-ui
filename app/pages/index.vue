@@ -142,10 +142,9 @@
   )
   const canRetryResearch = computed(
     () =>
-      !!session.value.historyId &&
-      (session.value.status === 'completed' ||
-        (session.value.status === 'failed' &&
-          (session.value.phase === 'research' || session.value.phase === 'report'))),
+      session.value.status === 'completed' ||
+      (session.value.status === 'failed' &&
+        (session.value.phase === 'research' || session.value.phase === 'report')),
   )
 
   function operationGuard(lease: ResearchOperationLease) {
@@ -240,9 +239,9 @@
   }
 
   async function retryResearchNode(nodeId: string) {
-    const historyId = session.value.historyId
+    let historyId = session.value.historyId
     const lease = beginResearchRetry()
-    if (!lease || !historyId) return
+    if (!lease) return
 
     try {
       const result = await deepResearchRef.value?.retryNode(nodeId, {
@@ -257,11 +256,23 @@
         learnings: result.learnings.map((item) => ({ ...item })),
       }
       reportRef.value?.displayReport('')
-      updateHistoryItem(historyId, {
+      const historyUpdates = {
         learnings: result.learnings.map((item) => ({ ...item })),
         feedback: lease.feedback.map((item) => ({ ...item })),
         report: '',
-      })
+      }
+      if (historyId) {
+        updateHistoryItem(historyId, historyUpdates)
+      } else {
+        historyId = addHistoryItem({
+          title: lease.input.query,
+          query: lease.input.query,
+          breadth: lease.input.breadth,
+          depth: lease.input.depth,
+          numQuestions: lease.input.numQuestions,
+          ...historyUpdates,
+        }).id
+      }
       const reportLease = completeResearch(lease, result, historyId)
       if (reportLease) await runReport(reportLease)
     } catch (error) {

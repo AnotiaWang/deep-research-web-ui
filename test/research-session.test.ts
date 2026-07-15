@@ -222,6 +222,33 @@ describe('research session reducer', () => {
     assert.equal(restored.failure, undefined)
   })
 
+  it('allows a retry after research fails before a history item is created', () => {
+    const failed = {
+      ...createInitialResearchSession(),
+      id: 'session-1',
+      status: 'failed' as const,
+      phase: 'research' as const,
+      input: { query: 'topic', breadth: 2, depth: 2, numQuestions: 3 },
+      failure: {
+        phase: 'research' as const,
+        code: 'upstream' as const,
+        message: 'No sources available',
+        retryable: true,
+      },
+    }
+
+    const retrying = researchSessionReducer(failed, {
+      type: 'BEGIN_RESEARCH_RETRY',
+      sessionId: 'session-1',
+      operationId: 'retry-1',
+      at,
+    })
+
+    assert.equal(retrying.status, 'running')
+    assert.equal(retrying.phase, 'research')
+    assert.equal(retrying.operationId, 'retry-1')
+  })
+
   it('preserves the previous report and rejects stale report completion', () => {
     const completed = {
       ...createInitialResearchSession(),
