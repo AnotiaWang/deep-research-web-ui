@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { feedbackInjectionKey, formInjectionKey } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
-  import { mergeFeedbackQuestions } from '~/utils/feedback'
+  import { hasMeaningfulFeedbackQuestions, mergeFeedbackQuestions } from '~/utils/feedback'
   import type {
     ResearchFeedbackResult,
     ResearchInputSnapshot,
@@ -39,6 +39,7 @@
 
   const isSubmitButtonDisabled = computed(
     () =>
+      !Array.isArray(feedback.value) ||
       !feedback.value.length ||
       // All questions should be answered
       feedback.value.some((v) => !v.assistantQuestion || !v.userAnswer) ||
@@ -83,25 +84,33 @@
         } else if (chunk.type === 'error') {
           error.value = chunk.message
         } else if (chunk.type === 'object') {
-          feedback.value = mergeFeedbackQuestions(feedback.value, chunk.value.questions)
+          feedback.value = mergeFeedbackQuestions(
+            Array.isArray(feedback.value) ? feedback.value : [],
+            chunk.value?.questions,
+          )
         } else if (chunk.type === 'bad-end') {
           error.value = t('invalidStructuredOutput')
         }
       }
       if (!isCurrent()) return
       console.log(`[ResearchFeedback] query: ${input.query}, feedback:`, feedback.value)
-      // Check if model returned questions
-      if (!feedback.value.length) {
+      // Ignore streamed empty placeholders like ["", "", ""]
+      if (!hasMeaningfulFeedbackQuestions(feedback.value)) {
+        feedback.value = []
         error.value = t('modelFeedback.noQuestions')
       }
-      if (error.value) throw new Error(error.value)
-      return feedback.value.map((item) => ({ ...item }))
+      if (error.value) {
+        feedback.value = []
+        throw new Error(error.value)
+      }
+      return (Array.isArray(feedback.value) ? feedback.value : []).map((item) => ({ ...item }))
     } catch (e: any) {
       if (!isCurrent()) return
       console.error('Error getting feedback:', e)
       if (e.message?.includes('Failed to fetch')) {
         e.message += `\n${t('error.requestBlockedByCORS')}`
       }
+      feedback.value = []
       error.value = t('modelFeedback.error', [e.message])
       throw e
     } finally {
@@ -144,9 +153,14 @@
 
         <ReasoningAccordion v-model="reasoningContent" :loading="isLoading" />
 
-        <div v-for="(feedback, index) in feedback" class="flex flex-col gap-2" :key="index">
-          {{ feedback.assistantQuestion }}
-          <UInput v-model="feedback.userAnswer" :disabled="disabled" />
+        <div
+          v-for="(item, index) in feedback"
+          v-show="item.assistantQuestion"
+          class="flex flex-col gap-2"
+          :key="index"
+        >
+          {{ item.assistantQuestion }}
+          <UInput v-model="item.userAnswer" :disabled="disabled" />
         </div>
       </template>
       <UButton

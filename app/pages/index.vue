@@ -48,7 +48,7 @@
           @submit="generateFeedback"
         />
         <ResearchFeedback
-          ref="feedback"
+          ref="feedbackComponent"
           :is-loading-search="isResearchRunning"
           :disabled="session.status !== 'awaiting-input'"
           @submit="startDeepSearch"
@@ -91,7 +91,7 @@
   const version = runtimeConfig.public.version
   const isServerMode = runtimeConfig.public.serverMode
 
-  const feedbackRef = useTemplateRef<InstanceType<typeof ResearchFeedback>>('feedback')
+  const feedbackRef = useTemplateRef<InstanceType<typeof ResearchFeedback>>('feedbackComponent')
   const deepResearchRef = useTemplateRef<InstanceType<typeof DeepResearch>>('deepResearch')
   const reportRef = useTemplateRef<InstanceType<typeof ResearchReport>>('report')
 

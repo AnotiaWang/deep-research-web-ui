@@ -54,6 +54,10 @@ export function generateFeedback({
   return parseStreamingJson(
     stream.fullStream,
     feedbackTypeSchema,
-    (value: PartialFeedback) => !!value.questions && value.questions.length > 0,
+    (value: PartialFeedback) =>
+      Array.isArray(value.questions) &&
+      value.questions.some(
+        (question) => typeof question === 'string' && question.trim().length > 0,
+      ),
   )
 }
