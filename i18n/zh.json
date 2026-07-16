@@ -81,6 +81,8 @@
     "depthHelp": "联网搜索的迭代轮数。",
     "breadth": "研究广度 (Breadth)",
     "breadthHelp": "第一次迭代中的搜索次数。后续每轮迭代的搜索次数为上一轮的一半。",
+    "required": "此项为必填项。",
+    "integerRange": "请输入 {min} 到 {max} 之间的整数。",
     "start": "开始研究",
     "researching": "研究中..."
   },
@@ -134,6 +136,13 @@
   },
   "fullscreen": "全屏",
   "exitFullscreen": "退出全屏",
+  "graphControls": {
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fitView": "适应画布",
+    "lockView": "锁定画布交互",
+    "unlockView": "解锁画布交互"
+  },
   "serverMode": {
     "title": "服务端模式",
     "description": "当前运行在服务端模式，所有配置由服务器提供，无需手动设置 API 密钥。",
@@ -184,6 +193,11 @@
   },
   "common": {
     "delete": "删除",
-    "cancel": "取消"
+    "cancel": "取消",
+    "language": "语言",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "useLightTheme": "切换到浅色主题",
+    "useDarkTheme": "切换到深色主题"
   }
 }

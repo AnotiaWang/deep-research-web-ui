@@ -5,6 +5,7 @@
     icon="i-lucide-github"
     to="https://github.com/AnotiaWang/deep-research-web-ui"
     target="_blank"
-  >
-  </UButton>
+    aria-label="GitHub"
+    title="GitHub"
+  />
 </template>

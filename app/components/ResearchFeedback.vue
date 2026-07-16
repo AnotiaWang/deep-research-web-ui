@@ -1,5 +1,4 @@
 <script setup lang="ts">
-  import { feedbackInjectionKey, formInjectionKey } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
   import { hasMeaningfulFeedbackQuestions, mergeFeedbackQuestions } from '~/utils/feedback'
   import type {
@@ -22,6 +21,8 @@
     (e: 'submit'): void
   }>()
 
+  const feedback = defineModel<ResearchFeedbackResult[]>({ required: true })
+
   const { t, locale } = useI18n()
   const { showConfigManager, isConfigValid, config } = storeToRefs(useConfigStore())
   const runtimeConfig = useRuntimeConfig()
@@ -32,10 +33,6 @@
   const reasoningContent = ref('')
   const isLoading = ref(false)
   const error = ref('')
-
-  // Inject global data from index.vue
-  const form = inject(formInjectionKey)!
-  const feedback = inject(feedbackInjectionKey)!
 
   const isSubmitButtonDisabled = computed(
     () =>
@@ -51,10 +48,10 @@
 
   let activeRequest = 0
 
-  async function getFeedback(options?: GetFeedbackOptions) {
+  async function getFeedback(options: GetFeedbackOptions) {
     const requestId = ++activeRequest
-    const input = options?.input ?? form.value
-    const isCurrent = options?.isCurrent ?? (() => requestId === activeRequest)
+    const { input, signal } = options
+    const isCurrent = options.isCurrent
     clear()
     activeRequest = requestId
 
@@ -74,7 +71,7 @@
         numQuestions: input.numQuestions,
         language: t('language', {}, { locale: locale.value }),
         aiConfig: config.value.ai,
-        signal: options?.signal,
+        signal,
       })
 
       for await (const chunk of chunks) {
@@ -159,8 +156,10 @@
           class="flex flex-col gap-2"
           :key="index"
         >
-          {{ item.assistantQuestion }}
-          <UInput v-model="item.userAnswer" :disabled="disabled" />
+          <label :for="`feedback-answer-${index}`">
+            {{ item.assistantQuestion }}
+          </label>
+          <UInput :id="`feedback-answer-${index}`" v-model="item.userAnswer" :disabled="disabled" />
         </div>
       </template>
       <UButton

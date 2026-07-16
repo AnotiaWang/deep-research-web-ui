@@ -208,7 +208,11 @@
 <template>
   <div>
     <UModal v-model:open="showModal" :title="$t('settings.title')">
-      <UButton icon="i-lucide-settings" />
+      <UButton
+        icon="i-lucide-settings"
+        :aria-label="$t('settings.title')"
+        :title="$t('settings.title')"
+      />
 
       <template #body>
         <UAccordion v-model="activeSections" type="multiple" :items="settingSections" collapsible>

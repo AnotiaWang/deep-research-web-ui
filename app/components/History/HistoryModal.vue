@@ -121,6 +121,8 @@
       variant="subtle"
       icon="i-lucide-history"
       :disabled="props.disabled"
+      :aria-label="t('history.title')"
+      :title="t('history.title')"
       @click="showModal = true"
     />
     <template #body>
@@ -204,6 +206,8 @@
                   variant="ghost"
                   size="sm"
                   icon="i-lucide-trash-2"
+                  :aria-label="t('history.delete')"
+                  :title="t('history.delete')"
                   @click="confirmDelete(item.id)"
                 />
               </div>

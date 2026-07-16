@@ -81,6 +81,8 @@
     "depthHelp": "Number of iterations.",
     "breadth": "Breadth",
     "breadthHelp": "Number of searches in the first iteration. The search width of each iteration is half of the previous one.",
+    "required": "This field is required.",
+    "integerRange": "Enter a whole number from {min} to {max}.",
     "start": "Start Research",
     "researching": "Researching..."
   },
@@ -134,6 +136,13 @@
   },
   "fullscreen": "Fullscreen",
   "exitFullscreen": "Exit fullscreen",
+  "graphControls": {
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitView": "Fit graph to view",
+    "lockView": "Lock graph interaction",
+    "unlockView": "Unlock graph interaction"
+  },
   "serverMode": {
     "title": "Server Mode",
     "description": "Currently running in server mode. All configurations are provided by the server, no need to set API keys manually.",
@@ -184,6 +193,11 @@
   },
   "common": {
     "delete": "Delete",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "language": "Language",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "useLightTheme": "Use light theme",
+    "useDarkTheme": "Use dark theme"
   }
 }

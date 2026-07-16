@@ -1,9 +1,4 @@
 <script setup lang="ts">
-  import {
-    feedbackInjectionKey,
-    formInjectionKey,
-    researchResultInjectionKey,
-  } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
   import { createCitationHtml, renderSafeMarkdown } from '~/utils/markdown'
   import { getStreamErrorMessage } from '~~/shared/utils/stream-error'
@@ -23,6 +18,8 @@
 
   const props = defineProps<{
     disabled?: boolean
+    query: string
+    result: ResearchResult
   }>()
 
   const emit = defineEmits<{
@@ -43,11 +40,6 @@
   const reportContent = ref('')
   const reportContainerRef = ref<HTMLElement>()
 
-  // Inject global data from index.vue
-  const form = inject(formInjectionKey)!
-  const feedback = inject(feedbackInjectionKey)!
-  const researchResult = inject(researchResultInjectionKey)!
-
   const isExportButtonDisabled = computed(
     () =>
       !reportContent.value ||
@@ -57,7 +49,7 @@
   )
 
   const reportHtml = computed(() => {
-    const learnings = researchResult.value?.learnings ?? []
+    const learnings = props.result.learnings
     const markdownWithCitations = reportContent.value.replace(
       /\[(\d+)\](?!\()/g,
       (match, number) => {
@@ -96,9 +88,8 @@
 
   // 设置 tooltip 事件监听
   function setupTooltips() {
-    if (!reportContainerRef.value) return
-
     removeTooltip()
+    if (!reportContainerRef.value) return
 
     // 创建一个通用的 tooltip 元素
     const tooltip = document.createElement('div')
@@ -150,12 +141,10 @@
 
   let activeReport = 0
 
-  async function generateReport(options?: GenerateReportOptions) {
+  async function generateReport(options: GenerateReportOptions) {
     const reportId = ++activeReport
-    const input = options?.input ?? form.value
-    const feedbackSnapshot = options?.feedback ?? feedback.value
-    const result = options?.result ?? researchResult.value
-    const isCurrent = options?.isCurrent ?? (() => reportId === activeReport)
+    const { input, feedback: feedbackSnapshot, result, signal } = options
+    const isCurrent = options.isCurrent
     const previousReport = reportContent.value
     loading.value = true
     error.value = ''
@@ -170,7 +159,7 @@
         language: t('language', {}, { locale: locale.value }),
         learnings,
         aiConfig: config.value.ai,
-        signal: options?.signal,
+        signal,
       })
       for await (const chunk of fullStream) {
         if (!isCurrent()) return
@@ -209,51 +198,61 @@
   }
 
   async function exportToPdf() {
-    // Change the title back
+    loadingExportPdf.value = true
+    const temporaryTitle = useHead({
+      title: `Deep Research Report - ${props.query || 'Untitled'}`,
+    })
+    let printDialogOpened = false
+    let cleanedUp = false
     const cleanup = () => {
-      useHead({
-        title: 'Deep Research Web UI',
-      })
+      if (cleanedUp) return
+      cleanedUp = true
+      temporaryTitle.dispose()
       loadingExportPdf.value = false
     }
-    loadingExportPdf.value = true
-    // Temporarily change the document title, which will be used as the filename
-    useHead({
-      title: `Deep Research Report - ${form.value.query ?? 'Untitled'}`,
-    })
-    // Wait after title is changed
-    await new Promise((r) => setTimeout(r, 100))
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
-    if (!printJS) {
-      printJS = (await import('print-js')).default
+      if (!printJS) {
+        printJS = (await import('print-js')).default
+      }
+
+      printJS({
+        printable: reportHtml.value,
+        type: 'raw-html',
+        showModal: true,
+        onIncompatibleBrowser() {
+          toast.add({
+            title: t('researchReport.incompatibleBrowser'),
+            description: t('researchReport.incompatibleBrowserDescription'),
+            duration: 10_000,
+          })
+          cleanup()
+        },
+        onError(error, xmlHttpRequest) {
+          console.error(`[Export PDF] failed:`, error, xmlHttpRequest)
+          toast.add({
+            title: t('researchReport.exportFailed'),
+            description: error instanceof Error ? error.message : String(error),
+            duration: 10_000,
+          })
+          cleanup()
+        },
+        onPrintDialogClose() {
+          cleanup()
+        },
+      })
+      printDialogOpened = true
+    } catch (error) {
+      console.error(`[Export PDF] failed:`, error)
+      toast.add({
+        title: t('researchReport.exportFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        duration: 10_000,
+      })
+    } finally {
+      if (!printDialogOpened) cleanup()
     }
-
-    printJS({
-      printable: reportHtml.value,
-      type: 'raw-html',
-      showModal: true,
-      onIncompatibleBrowser() {
-        toast.add({
-          title: t('researchReport.incompatibleBrowser'),
-          description: t('researchReport.incompatibleBrowserDescription'),
-          duration: 10_000,
-        })
-        cleanup()
-      },
-      onError(error, xmlHttpRequest) {
-        console.error(`[Export PDF] failed:`, error, xmlHttpRequest)
-        toast.add({
-          title: t('researchReport.exportFailed'),
-          description: error instanceof Error ? error.message : String(error),
-          duration: 10_000,
-        })
-        cleanup()
-      },
-      onPrintDialogClose() {
-        cleanup()
-      },
-    })
-    return
   }
 
   async function exportToMarkdown() {

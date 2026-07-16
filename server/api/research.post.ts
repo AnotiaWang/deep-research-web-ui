@@ -5,6 +5,7 @@ import type { RuntimeConfig } from 'nuxt/schema'
 import fs from 'node:fs'
 import path from 'node:path'
 import { abortable, isAbortError } from '~~/shared/utils/abort'
+import { researchRequestSchema } from '~~/shared/utils/research-input'
 
 // --- ApiKeyPool with File-based State Persistence ---
 
@@ -125,7 +126,14 @@ let googleApiKeyPool: ApiKeyPool | undefined
 
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
-  const body = await readBody(event)
+  const parsedBody = researchRequestSchema.safeParse(await readBody(event))
+  if (!parsedBody.success) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid research request parameters',
+      data: parsedBody.error.flatten(),
+    })
+  }
 
   const {
     query,
@@ -137,15 +145,7 @@ export default defineEventHandler(async (event) => {
     currentDepth = 1,
     nodeId = '0',
     retryNode,
-  } = body
-
-  // Validate required parameters
-  if (!query || !breadth || !depth || !languageCode) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Missing required parameters',
-    })
-  }
+  } = parsedBody.data
 
   // Create server-side configuration
   const serverConfig: ConfigAi = {

@@ -42,6 +42,7 @@
         />
 
         <ResearchForm
+          v-model="form"
           :is-loading-feedback="isFeedbackRunning"
           :disabled="!canBeginFeedback"
           :submit-disabled="!canBeginFeedback"
@@ -49,6 +50,7 @@
         />
         <ResearchFeedback
           ref="feedbackComponent"
+          v-model="feedback"
           :is-loading-search="isResearchRunning"
           :disabled="session.status !== 'awaiting-input'"
           @submit="startDeepSearch"
@@ -57,6 +59,8 @@
         <ResearchReport
           ref="report"
           :disabled="!canRegenerateReport"
+          :query="form.query"
+          :result="researchResult"
           @regenerate="regenerateReport"
         />
       </div>
@@ -69,7 +73,6 @@
   import type ResearchFeedback from '@/components/ResearchFeedback.vue'
   import type DeepResearch from '@/components/DeepResearch/DeepResearch.vue'
   import type ResearchReport from '@/components/ResearchReport.vue'
-  import type { ResearchResult } from '~~/lib/core/deep-research'
   import type { ResearchHistoryItem } from '~/types/history'
   import { useHistory } from '~/composables/useHistory'
   import type {
@@ -78,13 +81,9 @@
     ResearchInputData,
     ResearchOperationLease,
     ResearchPhase,
+    ResearchResult,
   } from '~~/shared/types/research-session'
   import { isTimeoutError } from '~~/shared/utils/abort'
-  import {
-    feedbackInjectionKey,
-    formInjectionKey,
-    researchResultInjectionKey,
-  } from '@/constants/injection-keys'
 
   const runtimeConfig = useRuntimeConfig()
   const { t } = useI18n()
@@ -105,10 +104,6 @@
   const researchResult = ref<ResearchResult>({
     learnings: [],
   })
-
-  provide(formInjectionKey, form)
-  provide(feedbackInjectionKey, feedback)
-  provide(researchResultInjectionKey, researchResult)
 
   const {
     state: session,
@@ -173,8 +168,8 @@
     }
   }
 
-  async function generateFeedback() {
-    const lease = beginFeedback({ ...form.value })
+  async function generateFeedback(input: ResearchInputData) {
+    const lease = beginFeedback({ ...input })
     if (!lease) return
     const signal = operationRuntime.start(lease, 'feedback')
 
@@ -211,6 +206,9 @@
       })
       if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
       if (!result?.learnings.length) throw new Error(t('researchSession.noLearnings'))
+      researchResult.value = {
+        learnings: result.learnings.map((item) => ({ ...item })),
+      }
 
       const historyItem = addHistoryItem({
         title: lease.input.query,

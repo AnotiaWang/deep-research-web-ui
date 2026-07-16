@@ -29,6 +29,8 @@
     icon="i-lucide-languages"
     :model-value="value ?? globalLocale"
     :items="localeOptions"
+    :aria-label="t('common.language')"
+    :title="t('common.language')"
     @update:model-value="changeLocale($event)"
   />
 </template>

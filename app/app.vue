@@ -1,5 +1,5 @@
 <template>
-  <UApp :locale="zh_cn">
+  <UApp :locale="uiLocale">
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
@@ -7,7 +7,11 @@
 </template>
 
 <script setup lang="ts">
-  import { zh_cn } from '@nuxt/ui/locale'
+  import { en, nl, zh_cn } from '@nuxt/ui/locale'
+
+  const { locale } = useI18n()
+  const uiLocales = { en, nl, zh: zh_cn } as const
+  const uiLocale = computed(() => uiLocales[locale.value as keyof typeof uiLocales] ?? en)
 
   // TODO
   useHead({

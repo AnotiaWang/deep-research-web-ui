@@ -5,11 +5,6 @@
     type ProcessedSearchResult,
     type ResearchStep,
   } from '~~/lib/core/deep-research'
-  import {
-    feedbackInjectionKey,
-    formInjectionKey,
-    researchResultInjectionKey,
-  } from '~/constants/injection-keys'
   import Flow, { type SearchNode, type SearchEdge } from './SearchFlow.vue'
   import SearchFlow from './SearchFlow.vue'
   import NodeDetail from './NodeDetail.vue'
@@ -18,6 +13,7 @@
   import { useServerMode } from '~/composables/useServerMode'
   import { collectResearchResult } from '~/utils/research-result'
   import { resolveResearchRetryQuery } from '~/utils/research-retry'
+  import { createFlowNode } from '~/utils/research-graph'
   import { abortable } from '~~/shared/utils/abort'
   import type {
     ResearchFeedbackSnapshot,
@@ -86,15 +82,7 @@
     }
   })
 
-  // Inject global data from index.vue
-  const form = inject(formInjectionKey)!
-  const feedback = inject(feedbackInjectionKey)!
-  const completeResult = inject(researchResultInjectionKey)!
-
-  function handleResearchProgress(
-    step: ResearchStep,
-    updateCompleteResult = true,
-  ): ResearchResult | undefined {
+  function handleResearchProgress(step: ResearchStep): ResearchResult | undefined {
     let node: DeepResearchNode | undefined
     let nodeId = ''
 
@@ -214,7 +202,6 @@
         const result = {
           learnings: step.learnings,
         }
-        if (updateCompleteResult) completeResult.value = result
         isLoading.value = false
         return result
     }
@@ -231,12 +218,7 @@
 
   // The default root node for SearchFlow
   function flowRootNode(): SearchNode {
-    return {
-      id: '0',
-      data: { title: 'Start' },
-      position: { x: 0, y: 0 },
-      type: 'search', // We only have this type
-    }
+    return createFlowNode('0', { title: 'Start' })
   }
 
   interface ResearchGraphSnapshot {
@@ -268,12 +250,11 @@
 
   let activeResearch = 0
 
-  async function startResearch(options?: StartResearchOptions, retryNode?: DeepResearchNode) {
-    const input = options?.input ?? form.value
-    const feedbackSnapshot = options?.feedback ?? feedback.value
+  async function startResearch(options: StartResearchOptions, retryNode?: DeepResearchNode) {
+    const { input, feedback: feedbackSnapshot } = options
     if (!input.query || !input.breadth || !input.depth) return
     const researchId = ++activeResearch
-    const isCurrent = options?.isCurrent ?? (() => researchId === activeResearch)
+    const isCurrent = options.isCurrent
     let result: ResearchResult | undefined
 
     // Clear all nodes if it's not a retry
@@ -292,7 +273,7 @@
 
     try {
       // Wait after the flow is cleared
-      await abortable(new Promise((resolve) => requestAnimationFrame(resolve)), options?.signal)
+      await abortable(new Promise((resolve) => requestAnimationFrame(resolve)), options.signal)
 
       let query = getCombinedQuery(input, [...feedbackSnapshot])
       let existingLearnings: ProcessedSearchResult['learnings'] = []
@@ -322,10 +303,10 @@
         languageCode: locale.value,
         searchLanguageCode: config.webSearch.searchLanguage,
         learnings: existingLearnings,
-        signal: options?.signal,
+        signal: options.signal,
         onProgress: (step) => {
           if (!isCurrent()) return
-          result = handleResearchProgress(step, !retryNode) ?? result
+          result = handleResearchProgress(step) ?? result
         },
       })
       if (!isCurrent()) return
@@ -348,9 +329,9 @@
     }
   }
 
-  async function retryNode(nodeId: string, options?: StartResearchOptions) {
+  async function retryNode(nodeId: string, options: StartResearchOptions) {
     console.log('[DeepResearch] retryNode', nodeId, isLoading.value)
-    if (!nodeId || isLoading.value || (props.disabled && !options)) return
+    if (!nodeId || isLoading.value) return
 
     const graphSnapshot = snapshotResearchGraph()
 
@@ -440,6 +421,7 @@
             icon="i-material-symbols:fullscreen-exit"
             variant="ghost"
             color="info"
+            :aria-label="t('exitFullscreen')"
             @click="toggleFullscreen"
           />
         </UTooltip>
@@ -491,6 +473,7 @@
             icon="i-material-symbols:fullscreen"
             variant="ghost"
             color="info"
+            :aria-label="t('fullscreen')"
             @click="toggleFullscreen"
           />
         </UTooltip>

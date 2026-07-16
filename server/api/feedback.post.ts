@@ -1,19 +1,18 @@
 import { generateFeedback } from '~~/lib/core/feedback'
 import type { ConfigAi } from '~~/shared/types/config'
+import { feedbackRequestSchema } from '~~/shared/utils/research-input'
 
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
-  const body = await readBody(event)
-
-  const { query, language, numQuestions = 3 } = body
-
-  // Validate required parameters
-  if (!query || !language) {
+  const parsedBody = feedbackRequestSchema.safeParse(await readBody(event))
+  if (!parsedBody.success) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Missing required parameters',
+      statusMessage: 'Invalid feedback request parameters',
+      data: parsedBody.error.flatten(),
     })
   }
+  const { query, language, numQuestions } = parsedBody.data
 
   // Create server-side configuration
   const serverConfig: ConfigAi = {

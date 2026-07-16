@@ -77,6 +77,8 @@
     "depthHelp": "Aantal iteraties.",
     "breadth": "Breedte",
     "breadthHelp": "Aantal zoekopdrachten in de eerste iteratie. De zoekbreedte van elke iteratie is de helft van de vorige.",
+    "required": "Dit veld is verplicht.",
+    "integerRange": "Voer een geheel getal van {min} tot {max} in.",
     "start": "Begin Onderzoek",
     "researching": "Onderzoeken..."
   },
@@ -130,6 +132,13 @@
   },
   "exitFullscreen": "Volledig scherm verlaten",
   "fullscreen": "Volledig scherm",
+  "graphControls": {
+    "zoomIn": "Inzoomen",
+    "zoomOut": "Uitzoomen",
+    "fitView": "Diagram passend weergeven",
+    "lockView": "Diagraminteractie vergrendelen",
+    "unlockView": "Diagraminteractie ontgrendelen"
+  },
   "serverMode": {
     "title": "Servermodus",
     "description": "Momenteel draait in servermodus. Alle configuraties worden door de server geleverd, geen handmatige API-sleutels nodig.",
@@ -180,6 +189,11 @@
   },
   "common": {
     "delete": "Verwijderen",
-    "cancel": "Annuleren"
+    "cancel": "Annuleren",
+    "language": "Taal",
+    "showPassword": "Wachtwoord tonen",
+    "hidePassword": "Wachtwoord verbergen",
+    "useLightTheme": "Licht thema gebruiken",
+    "useDarkTheme": "Donker thema gebruiken"
   }
 }
