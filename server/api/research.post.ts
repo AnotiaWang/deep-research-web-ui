@@ -141,6 +141,7 @@ export default defineEventHandler(async (event) => {
     depth,
     languageCode,
     searchLanguageCode,
+    originalQuery,
     learnings = [],
     currentDepth = 1,
     nodeId = '0',
@@ -184,6 +185,7 @@ export default defineEventHandler(async (event) => {
       try {
         await deepResearch({
           query,
+          originalQuery,
           breadth,
           maxDepth: depth,
           languageCode,

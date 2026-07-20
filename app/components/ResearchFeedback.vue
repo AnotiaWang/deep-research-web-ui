@@ -33,18 +33,18 @@
   const reasoningContent = ref('')
   const isLoading = ref(false)
   const error = ref('')
+  /** True after a feedback request finished successfully (including zero questions). */
+  const feedbackReady = ref(false)
 
-  const isSubmitButtonDisabled = computed(
-    () =>
-      !Array.isArray(feedback.value) ||
-      !feedback.value.length ||
-      // All questions should be answered
-      feedback.value.some((v) => !v.assistantQuestion || !v.userAnswer) ||
-      // Should not be loading
-      isLoading.value ||
-      props.isLoadingSearch ||
-      props.disabled,
-  )
+  const isSubmitButtonDisabled = computed(() => {
+    if (isLoading.value || props.isLoadingSearch || props.disabled || !feedbackReady.value) {
+      return true
+    }
+    if (!Array.isArray(feedback.value)) return true
+    // Empty list means the model judged the query clear enough to proceed.
+    if (!feedback.value.length) return false
+    return feedback.value.some((v) => !v.assistantQuestion || !v.userAnswer)
+  })
 
   let activeRequest = 0
 
@@ -91,15 +91,16 @@
       }
       if (!isCurrent()) return
       console.log(`[ResearchFeedback] query: ${input.query}, feedback:`, feedback.value)
-      // Ignore streamed empty placeholders like ["", "", ""]
-      if (!hasMeaningfulFeedbackQuestions(feedback.value)) {
-        feedback.value = []
-        error.value = t('modelFeedback.noQuestions')
-      }
       if (error.value) {
         feedback.value = []
         throw new Error(error.value)
       }
+      // Placeholder-only streams are treated as invalid; a true empty list is OK
+      // only when the model explicitly returned {"questions":[]} (no bad-end).
+      if (!hasMeaningfulFeedbackQuestions(feedback.value)) {
+        feedback.value = []
+      }
+      feedbackReady.value = true
       return (Array.isArray(feedback.value) ? feedback.value : []).map((item) => ({ ...item }))
     } catch (e: any) {
       if (!isCurrent()) return
@@ -108,6 +109,7 @@
         e.message += `\n${t('error.requestBlockedByCORS')}`
       }
       feedback.value = []
+      feedbackReady.value = false
       error.value = t('modelFeedback.error', [e.message])
       throw e
     } finally {
@@ -121,6 +123,7 @@
     error.value = ''
     reasoningContent.value = ''
     isLoading.value = false
+    feedbackReady.value = false
   }
 
   defineExpose({
@@ -140,12 +143,18 @@
     </template>
 
     <div class="flex flex-col gap-2">
-      <div v-if="!feedback.length && !reasoningContent && !error">
+      <div v-if="!feedbackReady && !feedback.length && !reasoningContent && !error">
         {{ $t('modelFeedback.waiting') }}
       </div>
       <template v-else>
         <div v-if="error" class="text-red-500 whitespace-pre-wrap">
           {{ error }}
+        </div>
+        <div
+          v-else-if="feedbackReady && !feedback.length"
+          class="text-sm text-gray-500 whitespace-pre-wrap"
+        >
+          {{ $t('modelFeedback.noQuestions') }}
         </div>
 
         <ReasoningAccordion v-model="reasoningContent" :loading="isLoading" />
@@ -169,7 +178,11 @@
         block
         @click="$emit('submit')"
       >
-        {{ $t('modelFeedback.submit') }}
+        {{
+          feedbackReady && !feedback.length
+            ? $t('modelFeedback.continue')
+            : $t('modelFeedback.submit')
+        }}
       </UButton>
     </div>
   </UCard>

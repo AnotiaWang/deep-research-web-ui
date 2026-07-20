@@ -280,13 +280,14 @@
       // Wait after the flow is cleared
       await abortable(new Promise((resolve) => requestAnimationFrame(resolve)), options.signal)
 
-      let query = getCombinedQuery(input, [...feedbackSnapshot])
+      const originalQuery = getCombinedQuery(input, [...feedbackSnapshot])
+      let query = originalQuery
       let existingLearnings: ProcessedSearchResult['learnings'] = []
       let currentDepth = 1
       let breadth = input.breadth
 
       if (retryNode) {
-        query = resolveResearchRetryQuery(query, retryNode)
+        query = resolveResearchRetryQuery(originalQuery, retryNode)
         // Set the search depth and breadth to its parent's
         if (!isRootNode(retryNode.id)) {
           const parentId = parentNodeId(retryNode.id)!
@@ -300,6 +301,7 @@
 
       await researchFunction({
         query,
+        originalQuery,
         retryNode,
         currentDepth,
         breadth,

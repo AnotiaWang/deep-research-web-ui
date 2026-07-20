@@ -87,8 +87,9 @@
     "description": "De AI stelt u een aantal vervolgvragen om de onderzoeksrichting te verduidelijken.",
     "waiting": "Wachten op feedback van het model...",
     "submit": "Antwoord versturen",
+    "continue": "Onderzoek voortzetten",
     "error": "Fout bij het ontvangen van feedback: {0}",
-    "noQuestions": "Het model heeft geen vervolgvragen geretourneerd."
+    "noQuestions": "Je vraag is al duidelijk genoeg. Er zijn geen vervolgvragen nodig — je kunt doorgaan."
   },
   "webBrowsing": {
     "title": "3. Zoeken op het Internet",

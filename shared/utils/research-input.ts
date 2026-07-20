@@ -34,6 +34,8 @@ export const researchRequestSchema = researchInputSchema
   .extend({
     languageCode: supportedLocale,
     searchLanguageCode: supportedLocale.optional(),
+    /** Root user goal preserved when retrying or recursing with a narrowed query */
+    originalQuery: z.string().trim().min(1).optional(),
     learnings: z
       .array(
         z.object({

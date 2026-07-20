@@ -30,6 +30,7 @@ export function useServerMode() {
   // Server-side implementations
   const serverDeepResearch = async (params: {
     query: string
+    originalQuery?: string
     breadth: number
     maxDepth: number
     languageCode: Locale
@@ -43,6 +44,7 @@ export function useServerMode() {
   }) => {
     const {
       query,
+      originalQuery,
       breadth,
       maxDepth,
       languageCode,
@@ -62,6 +64,7 @@ export function useServerMode() {
       },
       body: JSON.stringify({
         query,
+        originalQuery,
         breadth,
         depth: maxDepth,
         languageCode,
@@ -139,6 +142,7 @@ export function useServerMode() {
       ? serverDeepResearch
       : (params: {
           query: string
+          originalQuery?: string
           breadth: number
           maxDepth: number
           languageCode: Locale

@@ -91,8 +91,9 @@
     "description": "The AI will ask you some follow up questions to help you clarify the research direction.",
     "waiting": "Waiting for model feedback...",
     "submit": "Submit Answer",
+    "continue": "Continue Research",
     "error": "Error getting feedback: {0}",
-    "noQuestions": "The model did not return any follow-up questions."
+    "noQuestions": "Your query is already clear enough. No follow-up questions are needed — you can continue."
   },
   "webBrowsing": {
     "title": "3. Web Browsing",

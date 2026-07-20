@@ -91,7 +91,8 @@
     "description": "AI 将会跟你确认一些细节，帮助你明确研究方向。",
     "waiting": "等待模型反馈...",
     "submit": "提交回答",
-    "noQuestions": "模型没有返回任何问题，请重试",
+    "continue": "继续研究",
+    "noQuestions": "问题已经足够清晰，无需补充追问，可以直接继续。",
     "error": "获取反馈失败：{0}"
   },
   "webBrowsing": {

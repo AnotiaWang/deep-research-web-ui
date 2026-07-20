@@ -76,4 +76,19 @@ describe('research input validation', () => {
       false,
     )
   })
+
+  it('accepts optional originalQuery for narrowed retries', () => {
+    const parsed = researchRequestSchema.safeParse({
+      query: 'narrowed follow-up',
+      originalQuery: 'Initial Query: full topic',
+      breadth: 2,
+      depth: 2,
+      languageCode: 'zh',
+      searchLanguageCode: 'en',
+    })
+    assert.equal(parsed.success, true)
+    if (parsed.success) {
+      assert.equal(parsed.data.originalQuery, 'Initial Query: full topic')
+    }
+  })
 })
