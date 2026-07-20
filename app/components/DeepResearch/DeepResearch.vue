@@ -5,8 +5,7 @@
     type ProcessedSearchResult,
     type ResearchStep,
   } from '~~/lib/core/deep-research'
-  import Flow, { type SearchNode, type SearchEdge } from './SearchFlow.vue'
-  import SearchFlow from './SearchFlow.vue'
+  import SearchFlow, { type SearchNode, type SearchEdge } from './SearchFlow.vue'
   import NodeDetail from './NodeDetail.vue'
   import { isChildNode, isParentNode, isRootNode } from '~/utils/tree-node'
   import { UCard, UModal, UButton } from '#components'
@@ -66,7 +65,7 @@
   const isLargeScreen = useMediaQuery('(min-width: 768px)')
   const { deepResearch: researchFunction } = useServerMode()
 
-  const flowRef = ref<InstanceType<typeof Flow>>()
+  const flowRef = ref<InstanceType<typeof SearchFlow>>()
   const rootNode: DeepResearchNode = { id: '0', label: 'Start' }
   // The complete search data.
   // There's another tree stored in SearchNode.vue, with only basic data (id, status, ...)

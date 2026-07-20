@@ -13,7 +13,6 @@
   const uiLocales = { en, nl, zh: zh_cn } as const
   const uiLocale = computed(() => uiLocales[locale.value as keyof typeof uiLocales] ?? en)
 
-  // TODO
   useHead({
     title: 'Deep Research Web UI',
     script: [

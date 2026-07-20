@@ -1,5 +1,6 @@
 import { skipHydrate } from 'pinia'
 import { getApiBase } from '~~/shared/utils/ai-model'
+import { resolveWebSearchApiBase } from '~~/lib/core/web-search'
 import type { Config } from '~~/shared/types/config'
 
 function validateConfig(config: Config) {
@@ -90,15 +91,7 @@ export const useConfigStore = defineStore('config', () => {
     if (isServerMode.value) return '' // Not used in server mode
 
     const { webSearch } = config.value
-    if (webSearch.provider === 'tavily') {
-      return
-    }
-    if (webSearch.provider === 'firecrawl') {
-      return webSearch.apiBase || 'https://api.firecrawl.dev'
-    }
-    if (webSearch.provider === 'crw') {
-      return webSearch.apiBase || 'https://fastcrw.com/api'
-    }
+    return resolveWebSearchApiBase(webSearch.provider, webSearch.apiBase)
   })
 
   const showConfigManager = ref(false)
