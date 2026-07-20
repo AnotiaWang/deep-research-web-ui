@@ -87,8 +87,8 @@
       v-model="node.generateLearningsReasoning"
       class="my-2"
       :loading="
-        node.status === 'processing_serach_result_reasoning' ||
-        node.status === 'processing_serach_result'
+        node.status === 'processing_search_result_reasoning' ||
+        node.status === 'processing_search_result'
       "
     />
     <template v-for="({ learning }, index) in node.learnings" :key="index">

@@ -6,8 +6,8 @@ export type ResearchHistoryNodeStatus =
   | 'generated_query'
   | 'searching'
   | 'search_complete'
-  | 'processing_serach_result'
-  | 'processing_serach_result_reasoning'
+  | 'processing_search_result'
+  | 'processing_search_result_reasoning'
   | 'node_complete'
   | 'error'
 

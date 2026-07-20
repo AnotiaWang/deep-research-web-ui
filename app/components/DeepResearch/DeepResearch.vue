@@ -166,14 +166,14 @@
         break
       }
 
-      case 'processing_serach_result_reasoning': {
+      case 'processing_search_result_reasoning': {
         if (node) {
           node.generateLearningsReasoning = (node.generateLearningsReasoning ?? '') + step.delta
         }
         break
       }
 
-      case 'processing_serach_result': {
+      case 'processing_search_result': {
         if (node) {
           node.learnings = step.result.learnings || []
         }

@@ -43,13 +43,13 @@ export type ResearchStep =
   | { type: 'searching'; query: string; nodeId: string }
   | { type: 'search_complete'; results: WebSearchResult[]; nodeId: string }
   | {
-      type: 'processing_serach_result'
+      type: 'processing_search_result'
       query: string
       result: PartialProcessedSearchResult
       nodeId: string
     }
   | {
-      type: 'processing_serach_result_reasoning'
+      type: 'processing_search_result_reasoning'
       delta: string
       nodeId: string
     }
@@ -447,14 +447,14 @@ export async function deepResearch({
               if (chunk.type === 'object') {
                 searchResult = chunk.value
                 progress({
-                  type: 'processing_serach_result',
+                  type: 'processing_search_result',
                   result: chunk.value,
                   query: searchQuery.query,
                   nodeId: searchQuery.nodeId,
                 })
               } else if (chunk.type === 'reasoning') {
                 progress({
-                  type: 'processing_serach_result_reasoning',
+                  type: 'processing_search_result_reasoning',
                   delta: chunk.delta,
                   nodeId: searchQuery.nodeId,
                 })
