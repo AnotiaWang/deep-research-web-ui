@@ -219,6 +219,7 @@
         feedback: lease.feedback.map((item) => ({ ...item })),
         learnings: result.learnings.map((item) => ({ ...item })),
         report: '',
+        graph: deepResearchRef.value?.exportGraph(),
       })
       const reportLease = completeResearch(lease, result, historyItem.id)
       operationRuntime.finish(lease)
@@ -283,6 +284,7 @@
         learnings: result.learnings.map((item) => ({ ...item })),
         feedback: lease.feedback.map((item) => ({ ...item })),
         report: '',
+        graph: deepResearchRef.value?.exportGraph(),
       }
       if (historyId) {
         updateHistoryItem(historyId, historyUpdates)
@@ -324,7 +326,6 @@
 
   function loadHistoryItem(item: ResearchHistoryItem) {
     if (!loadHistory(item)) return
-    deepResearchRef.value?.clear()
     feedbackRef.value?.clear()
     reportRef.value?.displayReport('')
 
@@ -338,6 +339,7 @@
     researchResult.value = {
       learnings: item.learnings.map((learning) => ({ ...learning })),
     }
+    deepResearchRef.value?.importGraph(item.graph)
     reportRef.value?.displayReport(item.report || '')
   }
 </script>

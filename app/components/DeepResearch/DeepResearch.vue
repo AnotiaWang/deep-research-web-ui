@@ -14,14 +14,19 @@
   import { collectResearchResult } from '~/utils/research-result'
   import { resolveResearchRetryQuery } from '~/utils/research-retry'
   import { createFlowNode } from '~/utils/research-graph'
+  import {
+    createResearchHistoryGraph,
+    restoreResearchHistoryGraph,
+  } from '~/utils/research-history-graph'
   import { abortable } from '~~/shared/utils/abort'
+  import type { ResearchHistoryGraph, ResearchHistoryNodeStatus } from '~/types/history'
   import type {
     ResearchFeedbackSnapshot,
     ResearchInputSnapshot,
     ResearchResult,
   } from '~~/shared/types/research-session'
 
-  export type DeepResearchNodeStatus = Exclude<ResearchStep['type'], 'complete'>
+  export type DeepResearchNodeStatus = ResearchHistoryNodeStatus
 
   export type DeepResearchNode = {
     id: string
@@ -383,6 +388,34 @@
     nextTick(() => flowRef.value?.reset())
   }
 
+  function exportGraph(): ResearchHistoryGraph {
+    return createResearchHistoryGraph(nodes.value, selectedNodeId.value)
+  }
+
+  function importGraph(graph?: ResearchHistoryGraph) {
+    activeResearch += 1
+    isLoading.value = false
+    isFullscreen.value = false
+
+    if (!graph?.nodes?.length) {
+      nodes.value = [{ ...rootNode }]
+      selectedNodeId.value = undefined
+      searchResults.value = {}
+      flowNodes.value = [flowRootNode()]
+      flowEdges.value = []
+      nextTick(() => flowRef.value?.reset())
+      return
+    }
+
+    const restored = restoreResearchHistoryGraph(graph)
+    nodes.value = restored.nodes
+    selectedNodeId.value = restored.selectedNodeId
+    searchResults.value = restored.searchResults
+    flowNodes.value = restored.flowNodes
+    flowEdges.value = restored.flowEdges
+    nextTick(() => flowRef.value?.reset())
+  }
+
   let scrollY = 0
 
   function toggleFullscreen() {
@@ -402,6 +435,8 @@
     startResearch,
     retryNode,
     clear,
+    exportGraph,
+    importGraph,
     isLoading,
   })
 </script>

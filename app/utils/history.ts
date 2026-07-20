@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createRuntimeId } from '~~/shared/utils/id'
+import { researchHistoryGraphSchema } from '~/utils/research-history-graph'
 import type {
   NewResearchHistoryItem,
   ResearchHistory,
@@ -28,6 +29,7 @@ export const researchHistoryItemSchema = z.object({
   feedback: z.array(researchFeedbackSchema),
   learnings: z.array(researchLearningSchema),
   report: z.string(),
+  graph: researchHistoryGraphSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -76,14 +78,28 @@ export function updateResearchHistoryItem(
   } satisfies ResearchHistoryItem
 }
 
+function normalizeStoredHistoryItem(item: unknown): ResearchHistoryItem | null {
+  const parsed = researchHistoryItemSchema.safeParse(item)
+  if (parsed.success) return parsed.data
+
+  // Keep legacy/base fields even if an optional graph payload is malformed.
+  if (item && typeof item === 'object' && 'graph' in item) {
+    const { graph: _graph, ...rest } = item as Record<string, unknown>
+    const withoutGraph = researchHistoryItemSchema.safeParse(rest)
+    if (withoutGraph.success) return withoutGraph.data
+  }
+
+  return null
+}
+
 export function normalizeStoredHistory(value: unknown): ResearchHistory {
   const container = storedHistoryContainerSchema.safeParse(value)
   if (!container.success) return { items: [] }
 
   return {
     items: container.data.items.flatMap((item) => {
-      const parsed = researchHistoryItemSchema.safeParse(item)
-      return parsed.success ? [parsed.data] : []
+      const normalized = normalizeStoredHistoryItem(item)
+      return normalized ? [normalized] : []
     }),
   }
 }
