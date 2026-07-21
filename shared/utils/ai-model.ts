@@ -63,5 +63,8 @@ export function getApiBase(config: ConfigAi) {
   if (config.provider === '302-ai') {
     return config.apiBase || 'https://api.302.ai/v1'
   }
+  if (config.provider === 'litellm') {
+    return config.apiBase || 'http://localhost:4000/v1'
+  }
   return config.apiBase || 'https://api.openai.com/v1'
 }

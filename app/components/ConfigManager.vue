@@ -83,6 +83,12 @@
       label: 'Ollama',
       value: 'ollama',
     },
+    {
+      label: 'LiteLLM',
+      value: 'litellm',
+      link: 'https://docs.litellm.ai/docs/',
+      linkText: 'docs.litellm.ai',
+    },
   ])
   const webSearchProviderOptions = computed(() => [
     {
