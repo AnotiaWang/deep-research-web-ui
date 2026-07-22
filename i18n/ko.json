@@ -1,0 +1,168 @@
+{
+  "language": "한국어",
+  "modelThinking": "생각 중...",
+  "modelThinkingComplete": "생각 완료",
+  "invalidStructuredOutput": "모델이 반환한 내용이 불완전하거나 유효하지 않아 파싱할 수 없습니다. 더 크거나 \"똑똑한\" 모델을 사용해 보세요.",
+  "index": {
+    "projectDescription": "이 프로젝트는 {0}를 위한 웹 UI로, AI가 특정 질문을 기반으로 온라인에서 스스로 검색하고 더 깊이 파고든 후 연구 보고서를 출력할 수 있게 해줍니다.\n실시간 피드백을 위한 AI 응답 스트리밍과 트리 구조를 이용한 연구 과정 시각화를 제공합니다.\n모든 API 요청은 브라우저에서 직접 전송되며, 원격 서버에 데이터가 저장되지 않습니다.",
+    "missingConfigTitle": "설정이 되어 있지 않습니다",
+    "missingConfigDescription": "이 프로젝트는 사용자가 직접 API 키를 준비해야 합니다."
+  },
+  "settings": {
+    "title": "설정",
+    "disclaimer": "설정은 브라우저에 로컬로 저장됩니다.",
+    "save": "저장",
+    "ai": {
+      "provider": "AI 제공자",
+      "apiKey": "API 키",
+      "apiBase": "API Base URL",
+      "model": "모델",
+      "contextSize": "컨텍스트 길이",
+      "contextSizeHelp": "모델에 전송되는 최대 토큰 수입니다. 모델의 컨텍스트 길이보다 클 수 없습니다.",
+      "providers": {
+        "openaiCompatible": {
+          "title": "OpenAI 호환",
+          "description": "OpenAI API와 호환되는 모든 제공자입니다. 참고: 일부 제공자는 더 나은 성능을 위한 자체 옵션을 제공합니다."
+        },
+        "siliconflow": {
+          "title": "SiliconFlow",
+          "description": "가입 시 ¥14 무료 크레딧을 제공합니다. {0}에서 API 키를 발급받으세요."
+        },
+        "infiniai": {
+          "title": "InfiniAI",
+          "description": "가입 후 별도 제한 없이 풀 파워 DeepSeek R1 등 추론 가속 모델을 사용할 수 있습니다. {0}에 로그인한 후 API 키를 생성하세요."
+        },
+        "302-ai": {
+          "title": "302.AI",
+          "description": "가입 시 $1 무료 크레딧을 제공합니다. {0}에서 API 키를 발급받으세요."
+        }
+      }
+    },
+    "webSearch": {
+      "provider": "웹 검색 제공자",
+      "apiKey": "API 키",
+      "queryLanguage": "검색어 언어",
+      "queryLanguageHelp": "검색 쿼리의 언어입니다. 다른 언어로 검색 결과를 얻고 싶을 때 유용합니다.\n결론을 작성할 때 AI 모델은 여전히 웹 UI와 동일한 언어를 사용합니다.",
+      "providers": {
+        "tavily": {
+          "help": "Firecrawl과 비슷하지만 매월 1000회 무료 크레딧을 제공합니다. {0}에서 API 키를 발급받으세요.",
+          "advancedSearch": "고급 검색",
+          "advancedSearchHelp": "더 높은 품질의 검색 결과를 얻습니다. 매번 추가 크레딧 1회가 소모됩니다.",
+          "searchTopic": "검색 주제",
+          "searchTopicHelp": "선택한 주제에 맞춰 검색을 최적화하여 정제된 정보를 제공합니다. 기본값은 'general'입니다."
+        },
+        "firecrawl": {
+          "help": "공식 서비스를 사용 중이라면 {0}에서 API 키를 발급받으세요."
+        },
+        "crw": {
+          "help": "Firecrawl과 호환되는 웹 스크래퍼(단일 바이너리, 자체 호스팅 또는 클라우드)입니다. 클라우드 서비스를 사용 중이라면 {0}에서 API 키를 발급받거나, API Base URL을 자체 호스팅 서버 주소로 설정하세요."
+        },
+        "google-pse": {
+          "title": "Google PSE",
+          "help": "Google 프로그래밍 가능 검색 엔진(PSE)을 사용합니다. Google Cloud Console / PSE Console에서 발급한 API 키와 PSE ID가 필요합니다. 자세한 내용은 {0}에서 확인하세요.",
+          "apiKeyLabel": "Google API 키",
+          "apiKeyPlaceholder": "Google API 키를 입력하세요",
+          "pseIdLabel": "프로그래밍 가능 검색 엔진 ID (cx)",
+          "pseIdPlaceholder": "PSE ID(cx 값)를 입력하세요"
+        }
+      },
+      "concurrencyLimitHelp": "동시 검색 작업 수를 제한합니다. 검색 제공자에 과부하가 걸려 요청이 실패하는 것을 방지하는 데 유용합니다.",
+      "concurrencyLimit": "동시 실행 제한",
+      "apiBase": "API Base URL"
+    }
+  },
+  "researchTopic": {
+    "title": "1. 연구 주제",
+    "inputTitle": "연구 주제",
+    "placeholder": "무엇이든 연구하고 싶은 주제를 입력하세요...",
+    "numOfQuestions": "질문 수",
+    "numOfQuestionsHelp": "명확히 하기 위한 후속 질문의 개수입니다.",
+    "depth": "깊이(Depth)",
+    "depthHelp": "반복(iteration) 횟수입니다.",
+    "breadth": "너비(Breadth)",
+    "breadthHelp": "첫 번째 반복에서의 검색 횟수입니다. 각 반복의 검색 너비는 이전 반복의 절반입니다.",
+    "start": "연구 시작",
+    "researching": "연구 중..."
+  },
+  "modelFeedback": {
+    "title": "2. 모델 피드백",
+    "description": "AI가 연구 방향을 명확히 하기 위해 몇 가지 후속 질문을 합니다.",
+    "waiting": "모델 피드백을 기다리는 중...",
+    "submit": "답변 제출",
+    "error": "피드백을 가져오는 중 오류 발생: {0}",
+    "noQuestions": "모델이 후속 질문을 반환하지 않았습니다."
+  },
+  "webBrowsing": {
+    "title": "3. 웹 탐색",
+    "description": "AI가 연구 목표에 따라 웹을 검색하고, 지정된 깊이에 도달할 때까지 반복합니다.",
+    "clickToView": "자식 노드를 클릭하면 상세 정보를 볼 수 있습니다.",
+    "nodeDetails": "노드 상세 정보",
+    "startNode": {
+      "description": "여기가 심층 연구 여정의 시작점입니다!"
+    },
+    "researchGoal": "연구 목표",
+    "visitedUrls": "방문한 URL",
+    "learnings": "학습 내용",
+    "generating": "생성 중...",
+    "nodeFailed": "검색 실패",
+    "nodeFailedToast": "검색 노드 \"{label}\"가 실패했습니다",
+    "followUpQuestions": "후속 질문",
+    "retry": "재시도",
+    "noSearchResult": "검색 결과를 찾을 수 없습니다"
+  },
+  "researchReport": {
+    "title": "4. 연구 보고서",
+    "exportPdf": "인쇄 (PDF)",
+    "exportMarkdown": "마크다운 내보내기",
+    "sources": "출처",
+    "waiting": "보고서를 기다리는 중...",
+    "generating": "보고서 생성 중...",
+    "regenerate": "다시 생성",
+    "incompatibleBrowser": "호환되지 않는 브라우저",
+    "incompatibleBrowserDescription": "현재 브라우저는 이 인쇄 방식을 지원하지 않습니다. 최신 브라우저를 사용하거나, 마크다운을 내보낸 후 https://md-to-pdf.fly.dev 같은 다른 서비스를 이용해 직접 PDF로 변환해 보세요. (이용에 따른 책임은 본인에게 있습니다)",
+    "exportFailed": "내보내기 실패",
+    "generateFailed": "보고서 생성 실패: {0}"
+  },
+  "error": {
+    "requestBlockedByCORS": "현재 API 제공자가 교차 출처(cross-origin) 요청을 허용하지 않을 수 있습니다. 다른 서비스 제공자를 이용하거나 제공자에게 문의해 지원을 요청하세요."
+  },
+  "autoUpdate": {
+    "newVersionTitle": "새 버전이 있습니다: {0}",
+    "newVersionDescription": "참고: 자체 호스팅 버전을 사용 중이라면, 새 기능과 버그 수정을 받으려면 다시 배포해야 합니다.",
+    "refresh": "새로고침",
+    "dismiss": "닫기"
+  },
+  "fullscreen": "전체 화면",
+  "exitFullscreen": "전체 화면 종료",
+  "serverMode": {
+    "title": "서버 모드",
+    "description": "현재 서버 모드로 실행 중입니다. 모든 설정은 서버에서 제공하므로 API 키를 직접 설정할 필요가 없습니다.",
+    "loading": "설정을 불러오는 중...",
+    "loadFailed": "설정을 불러오지 못했습니다",
+    "aiProvider": "AI 제공자",
+    "aiModel": "AI 모델",
+    "webSearchProvider": "웹 검색 제공자",
+    "searchLanguage": "검색 언어",
+    "configNotice": "현재 설정은 서버 관리자가 지정한 것입니다. 변경이 필요하면 관리자에게 문의하세요."
+  },
+  "history": {
+    "title": "기록",
+    "export": "내보내기",
+    "import": "가져오기",
+    "empty": "기록이 없습니다",
+    "load": "불러오기",
+    "delete": "삭제",
+    "deleteAll": "전체 삭제",
+    "confirmDelete": "이 기록을 삭제하시겠습니까?",
+    "confirmDeleteAll": "모든 기록을 삭제하시겠습니까?",
+    "importSuccess": "가져오기 성공",
+    "importFailed": "가져오기 실패",
+    "depth": "깊이",
+    "breadth": "너비",
+    "questions": "질문 수"
+  },
+  "common": {
+    "delete": "삭제",
+    "cancel": "취소"
+  }
+}
