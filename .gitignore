@@ -8,6 +8,7 @@ dist
 
 # Node dependencies
 node_modules
+.agentpond/
 
 # Logs
 logs

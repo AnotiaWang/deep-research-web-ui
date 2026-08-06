@@ -173,6 +173,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | `NUXT_AI_API_BASE` | AI 服务商基础 URL | - |
 | `NUXT_WEB_SEARCH_API_KEY` | 联网搜索 API 密钥 | - |
 | `NUXT_WEB_SEARCH_API_BASE` | 联网搜索基础 URL | - |
+| `AGENTPOND_TRACING_ENABLED` | 启用服务端 AgentPond 追踪 | `false` |
 
 #### 公共配置（服务端模式）
 | 变量名 | 说明 | 默认值 |
@@ -201,6 +202,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 - Firecrawl 自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - fastCRW（`crw`）是与 Firecrawl 兼容的网页抓取工具（单一二进制文件；可自托管或使用云服务）。默认使用云端地址 `https://fastcrw.com/api`，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（文档中记为 `CRW_API_KEY`）；自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - Ollama 默认 API Base 为 `http://localhost:11434/v1`。如果应用运行在 Docker 容器内，`localhost` 指向容器自身；若 Ollama 运行在宿主机或其他容器中，请将 `NUXT_AI_API_BASE` 设置为容器可访问的宿主机地址或 Docker 网络地址。
+- AgentPond 追踪仅在服务端显式启用。启用前请加载 [Files SDK 环境](https://files-sdk.dev/docs/providers)；不会记录提示词或模型响应内容。
 
 ---
 

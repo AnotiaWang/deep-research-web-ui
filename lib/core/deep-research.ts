@@ -19,6 +19,7 @@ import {
   finalizeLearningsFromSearchResults,
 } from '~~/shared/utils/search-learning'
 import { abortable, isAbortError, throwIfAborted } from '~~/shared/utils/abort'
+import { agentPondTelemetry } from '../ai/telemetry'
 
 export type { ResearchResult } from '~~/shared/types/research-session'
 
@@ -157,6 +158,7 @@ export function generateSearchQueries({
     system: searchPlannerSystemPrompt(),
     prompt,
     abortSignal: signal,
+    experimental_telemetry: agentPondTelemetry('generate-search-queries'),
     onError({ error }) {
       throwAiError('generateSearchQueries', error)
     },
@@ -245,6 +247,7 @@ function processSearchResult({
     system: learningExtractorSystemPrompt(),
     prompt,
     abortSignal: signal,
+    experimental_telemetry: agentPondTelemetry('process-search-result'),
     onError({ error }) {
       throwAiError('processSearchResult', error)
     },
@@ -288,6 +291,7 @@ ${learning.learning}
     system: reportSystemPrompt(),
     prompt: _prompt,
     abortSignal: signal,
+    experimental_telemetry: agentPondTelemetry('write-final-report'),
     onError({ error }) {
       throwAiError('writeFinalReport', error)
     },
