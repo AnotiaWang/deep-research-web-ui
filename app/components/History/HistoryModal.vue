@@ -2,14 +2,21 @@
   import type { ResearchHistoryItem } from '~/types/history'
   import { useHistory } from '~/composables/useHistory'
 
+  const props = defineProps<{
+    disabled?: boolean
+  }>()
+
   const { t } = useI18n()
   const toast = useToast()
-  const { history, removeHistoryItem, exportHistoryItem, importHistoryItem, clearHistory } = useHistory()
+  const { history, removeHistoryItem, exportHistoryItem, importHistoryItem, clearHistory } =
+    useHistory()
   const showModal = ref(false)
   const loading = ref(false)
 
   const sortedHistory = computed(() =>
-    [...history.value.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [...history.value.items].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    ),
   )
 
   const fileInput = ref<HTMLInputElement>()
@@ -88,6 +95,7 @@
   }
 
   const loadHistoryItem = (item: ResearchHistoryItem) => {
+    if (props.disabled) return
     // 这里需要与主页面通信，加载历史记录
     emit('load', item as ResearchHistoryItem)
     showModal.value = false
@@ -108,16 +116,36 @@
 
 <template>
   <UModal v-model:open="showModal" :title="t('history.title')" size="xl">
-    <UButton color="primary" variant="subtle" icon="i-lucide-history" @click="showModal = true" />
+    <UButton
+      color="primary"
+      variant="subtle"
+      icon="i-lucide-history"
+      :disabled="props.disabled"
+      :aria-label="t('history.title')"
+      :title="t('history.title')"
+      @click="showModal = true"
+    />
     <template #body>
       <div class="flex flex-col gap-4">
         <!-- 导入按钮和删除全部 -->
         <div class="flex gap-2 justify-between items-center">
           <div class="flex gap-2">
-            <UButton color="info" variant="soft" icon="i-lucide-upload" @click="handleImport" :loading="loading">
+            <UButton
+              color="info"
+              variant="soft"
+              icon="i-lucide-upload"
+              @click="handleImport"
+              :loading="loading"
+            >
               {{ t('history.import') }}
             </UButton>
-            <input ref="fileInput" type="file" accept=".json" class="hidden" @change="handleFileSelect" />
+            <input
+              ref="fileInput"
+              type="file"
+              accept=".json"
+              class="hidden"
+              @change="handleFileSelect"
+            />
           </div>
 
           <UButton
@@ -159,6 +187,7 @@
                   variant="ghost"
                   size="sm"
                   icon="i-lucide-folder-open"
+                  :disabled="props.disabled"
                   @click="loadHistoryItem(item as ResearchHistoryItem)"
                 >
                   {{ t('history.load') }}
@@ -177,6 +206,8 @@
                   variant="ghost"
                   size="sm"
                   icon="i-lucide-trash-2"
+                  :aria-label="t('history.delete')"
+                  :title="t('history.delete')"
                   @click="confirmDelete(item.id)"
                 />
               </div>

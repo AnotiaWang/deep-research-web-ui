@@ -1,9 +1,12 @@
 import { deepResearch } from '~~/lib/core/deep-research'
+import { searchWeb, type WebSearchFunction, type WebSearchOptions } from '~~/lib/core/web-search'
 import pLimit from 'p-limit'
-import type { ConfigAi, ConfigWebSearch } from '~~/shared/types/config'
-import { RuntimeConfig } from 'nuxt/schema'
+import type { ConfigAi, ConfigWebSearchProvider } from '~~/shared/types/config'
+import type { RuntimeConfig } from 'nuxt/schema'
 import fs from 'node:fs'
 import path from 'node:path'
+import { isAbortError } from '~~/shared/utils/abort'
+import { researchRequestSchema } from '~~/shared/utils/research-input'
 
 // --- ApiKeyPool with File-based State Persistence ---
 
@@ -37,7 +40,10 @@ class ApiKeyPool {
     const envKeySet = new Set(keys)
     const stateKeySet = new Set(this.state.keys.map((k) => k.key))
 
-    if (this.state.keys.length !== keys.length || ![...envKeySet].every((k) => stateKeySet.has(k))) {
+    if (
+      this.state.keys.length !== keys.length ||
+      ![...envKeySet].every((k) => stateKeySet.has(k))
+    ) {
       this.state = {
         currentIndex: 0,
         keys: keys.map((key) => ({
@@ -70,7 +76,10 @@ class ApiKeyPool {
     try {
       fs.writeFileSync(this.cacheFilePath, JSON.stringify(this.state, null, 2))
     } catch (error: any) {
-      console.error(`[ApiKeyPool] Error: Could not write to cache file for ${this.cacheFilePath}.`, error.message)
+      console.error(
+        `[ApiKeyPool] Error: Could not write to cache file for ${this.cacheFilePath}.`,
+        error.message,
+      )
     }
   }
 
@@ -82,7 +91,7 @@ class ApiKeyPool {
     if (this.state.currentIndex >= activeKeys.length) {
       this.state.currentIndex = 0
     }
-    const keyConfig = activeKeys[this.state.currentIndex]
+    const keyConfig = activeKeys[this.state.currentIndex]!
     this.state.currentIndex = (this.state.currentIndex + 1) % activeKeys.length
     this.saveState()
     return keyConfig
@@ -94,7 +103,9 @@ class ApiKeyPool {
       keyConfig.errorCount++
       if (keyConfig.errorCount >= keyConfig.maxErrors) {
         keyConfig.active = false
-        console.error(`[ApiKeyPool] Disabling key due to multiple errors: ${key.substring(0, 8)}...`)
+        console.error(
+          `[ApiKeyPool] Disabling key due to multiple errors: ${key.substring(0, 8)}...`,
+        )
       }
       this.saveState()
     }
@@ -116,7 +127,14 @@ let googleApiKeyPool: ApiKeyPool | undefined
 
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
-  const body = await readBody(event)
+  const parsedBody = researchRequestSchema.safeParse(await readBody(event))
+  if (!parsedBody.success) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid research request parameters',
+      data: parsedBody.error.flatten(),
+    })
+  }
 
   const {
     query,
@@ -124,19 +142,12 @@ export default defineEventHandler(async (event) => {
     depth,
     languageCode,
     searchLanguageCode,
+    originalQuery,
     learnings = [],
     currentDepth = 1,
     nodeId = '0',
     retryNode,
-  } = body
-
-  // Validate required parameters
-  if (!query || !breadth || !depth || !languageCode) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Missing required parameters',
-    })
-  }
+  } = parsedBody.data
 
   // Create server-side configuration
   const serverConfig: ConfigAi = {
@@ -148,7 +159,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Create server-side web search function
-  const serverWebSearch = await createServerWebSearch(runtimeConfig)
+  const serverWebSearch = createServerWebSearch(runtimeConfig)
 
   // Create server-side pLimit instance
   const serverPLimit = pLimit(runtimeConfig.public.webSearchConcurrencyLimit)
@@ -158,202 +169,174 @@ export default defineEventHandler(async (event) => {
   setHeader(event, 'Cache-Control', 'no-cache')
   setHeader(event, 'Connection', 'keep-alive')
 
+  const requestAbort = createRequestAbort(
+    event,
+    serverOperationTimeout(runtimeConfig.public.researchResearchTimeoutMs),
+  )
+
   const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder()
+    async start(controller) {
+      const writer = createSSEWriter(controller, requestAbort.canWrite)
 
       const onProgress = (step: any) => {
-        const data = `data: ${JSON.stringify(step)}\n\n`
-        controller.enqueue(encoder.encode(data))
+        if (requestAbort.signal.aborted) return
+        writer.write(step)
       }
 
-      deepResearch({
-        query,
-        breadth,
-        maxDepth: depth,
-        languageCode,
-        aiConfig: serverConfig,
-        searchLanguageCode,
-        learnings,
-        currentDepth,
-        nodeId,
-        retryNode,
-        onProgress,
-        webSearchFunction: serverWebSearch,
-        pLimitInstance: serverPLimit,
-      })
-        .then((result) => {
-          controller.close()
+      try {
+        await deepResearch({
+          query,
+          originalQuery,
+          breadth,
+          maxDepth: depth,
+          languageCode,
+          aiConfig: serverConfig,
+          searchLanguageCode,
+          learnings,
+          currentDepth,
+          nodeId,
+          retryNode,
+          onProgress,
+          webSearchFunction: serverWebSearch,
+          pLimitInstance: serverPLimit,
+          signal: requestAbort.signal,
         })
-        .catch((error) => {
-          const errorData = `data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`
-          controller.enqueue(encoder.encode(errorData))
-          controller.close()
-        })
+      } catch (error) {
+        if (!requestAbort.signal.aborted) {
+          writer.write({
+            type: 'error',
+            message: error instanceof Error ? error.message : String(error),
+            nodeId,
+          })
+        }
+      } finally {
+        if (requestAbort.reason() === 'timeout') {
+          writer.write({
+            type: 'error',
+            code: 'timeout',
+            message: 'The research request timed out.',
+            nodeId,
+          })
+        }
+        requestAbort.cleanup()
+        writer.close()
+      }
+    },
+    cancel() {
+      requestAbort.abort('stream-cancel')
     },
   })
 
   return sendStream(event, stream)
 })
 
-async function createServerWebSearch(runtimeConfig: RuntimeConfig) {
-  // Import server-side web search implementation
-  const { tavily } = await import('@tavily/core')
-  const { default: Firecrawl } = await import('@mendable/firecrawl-js')
+function parseApiKeys(envValue: string | undefined, envName: string): string[] {
+  if (!envValue) {
+    throw new Error(`${envName} environment variable not set.`)
+  }
+  const keys = envValue
+    .split(',')
+    .map((key) => key.trim())
+    .filter((key) => key)
+  if (keys.length === 0) {
+    throw new Error(`${envName} environment variable is empty or contains only commas.`)
+  }
+  return keys
+}
 
-  return async (query: string, options: { maxResults?: number; lang?: string }) => {
-    const provider = runtimeConfig.public.webSearchProvider
-    const apiKey = runtimeConfig.webSearchApiKey
-    const apiBase = runtimeConfig.webSearchApiBase
+function getOrCreateApiKeyPool(
+  pool: ApiKeyPool | undefined,
+  setPool: (next: ApiKeyPool) => void,
+  providerName: string,
+  runtimeConfig: RuntimeConfig,
+): ApiKeyPool {
+  if (pool) return pool
+  const keys = parseApiKeys(runtimeConfig.webSearchApiKey, 'NUXT_WEB_SEARCH_API_KEY')
+  const next = new ApiKeyPool(keys, providerName)
+  setPool(next)
+  return next
+}
 
-    switch (provider) {
-      case 'firecrawl': {
-        const fc = new Firecrawl({
-          apiKey,
-          apiUrl: apiBase || 'https://api.firecrawl.dev',
-        })
-        // v2 SDK: `search` throws on error and returns results grouped by
-        // source (`web`/`news`/`images`); `maxResults` was renamed to `limit`.
-        const results = await fc.search(query, {
-          limit: options.maxResults || 5,
-          scrapeOptions: {
-            formats: ['markdown'],
-          },
-        })
-        return (results.web ?? [])
-          .filter((x: any) => !!x?.markdown && !!(x.url ?? x.metadata?.sourceURL))
-          .map((r: any) => ({
-            content: r.markdown!,
-            url: (r.url ?? r.metadata?.sourceURL)!,
-            title: r.title ?? r.metadata?.title,
-          }))
+function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFunction {
+  return async (query: string, options: WebSearchOptions) => {
+    const provider = runtimeConfig.public.webSearchProvider as ConfigWebSearchProvider
+    const sharedConfig = {
+      provider,
+      apiBase: runtimeConfig.webSearchApiBase,
+      googlePseId: runtimeConfig.public.googlePseId,
+      tavilyAdvancedSearch: runtimeConfig.public.tavilyAdvancedSearch,
+      tavilySearchTopic: runtimeConfig.public.tavilySearchTopic as
+        | 'general'
+        | 'news'
+        | 'finance'
+        | undefined,
+    }
+
+    if (provider === 'firecrawl' || provider === 'crw') {
+      return searchWeb(
+        {
+          ...sharedConfig,
+          apiKey: runtimeConfig.webSearchApiKey,
+        },
+        query,
+        options,
+      )
+    }
+
+    if (provider === 'google-pse') {
+      if (!runtimeConfig.public.googlePseId) {
+        throw new Error('NUXT_PUBLIC_GOOGLE_PSE_ID environment variable not set.')
       }
-
-      case 'crw': {
-        // fastCRW is a Firecrawl-compatible web scraper (single binary; self-host or cloud).
-        // Reuse the Firecrawl client pointed at the fastCRW base URL.
-        const fc = new Firecrawl({
-          apiKey,
-          apiUrl: apiBase || 'https://fastcrw.com/api',
-        })
-        const results = await fc.search(query, {
-          limit: options.maxResults || 5,
-          scrapeOptions: {
-            formats: ['markdown'],
-          },
-        })
-        return (results.web ?? [])
-          .filter((x: any) => !!x?.markdown && !!(x.url ?? x.metadata?.sourceURL))
-          .map((r: any) => ({
-            content: r.markdown!,
-            url: (r.url ?? r.metadata?.sourceURL)!,
-            title: r.title ?? r.metadata?.title,
-          }))
+      const pool = getOrCreateApiKeyPool(
+        googleApiKeyPool,
+        (next) => {
+          googleApiKeyPool = next
+        },
+        'google-pse',
+        runtimeConfig,
+      )
+      const selectedKeyConfig = pool.getNextKey()
+      if (!selectedKeyConfig) {
+        throw new Error('No active Google PSE API keys available.')
       }
-
-      case 'google-pse': {
-        const pseId = runtimeConfig.public.googlePseId
-        if (!pseId) {
-          throw new Error('NUXT_PUBLIC_GOOGLE_PSE_ID environment variable not set.')
-        }
-
-        if (!googleApiKeyPool) {
-          const apiKeysEnv = runtimeConfig.webSearchApiKey
-          if (!apiKeysEnv) {
-            throw new Error('NUXT_WEB_SEARCH_API_KEY environment variable not set for Google PSE.')
-          }
-          const keys = apiKeysEnv
-            .split(',')
-            .map((key: string) => key.trim())
-            .filter((key: string) => key)
-          if (keys.length === 0) {
-            throw new Error('NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.')
-          }
-          googleApiKeyPool = new ApiKeyPool(keys, 'google-pse')
-        }
-
-        const selectedKeyConfig = googleApiKeyPool.getNextKey()
-        if (!selectedKeyConfig) {
-          throw new Error('No active Google PSE API keys available.')
-        }
-        const currentApiKey = selectedKeyConfig.key
-
-        try {
-          const searchParams = new URLSearchParams({
-            key: currentApiKey,
-            cx: pseId,
-            q: query,
-            num: (options.maxResults || 5).toString(),
-          })
-          if (options.lang) {
-            searchParams.append('lr', `lang_${options.lang}`)
-          }
-
-          const apiUrl = `https://www.googleapis.com/customsearch/v1?${searchParams.toString()}`
-          const response = (await $fetch(apiUrl, { method: 'GET' })) as any
-
-          if (!response.items) {
-            googleApiKeyPool.markKeySuccess(currentApiKey)
-            return []
-          }
-
-          googleApiKeyPool.markKeySuccess(currentApiKey)
-          return response.items.map((item: any) => ({
-            content: item.snippet,
-            url: item.link,
-            title: item.title,
-          }))
-        } catch (e) {
-          googleApiKeyPool.markKeyError(currentApiKey)
-          throw e
-        }
+      const currentApiKey = selectedKeyConfig.key
+      try {
+        const results = await searchWeb({ ...sharedConfig, apiKey: currentApiKey }, query, options)
+        pool.markKeySuccess(currentApiKey)
+        return results
+      } catch (e) {
+        if (options.signal?.aborted || isAbortError(e)) throw e
+        pool.markKeyError(currentApiKey)
+        throw e
       }
+    }
 
-      case 'tavily':
-      default: {
-        if (!apiKeyPool) {
-          const apiKeysEnv = runtimeConfig.webSearchApiKey
-          if (!apiKeysEnv) {
-            throw new Error('NUXT_WEB_SEARCH_API_KEY environment variable not set.')
-          }
-          const keys = apiKeysEnv
-            .split(',')
-            .map((key: string) => key.trim())
-            .filter((key: string) => key)
-          if (keys.length === 0) {
-            throw new Error('NUXT_WEB_SEARCH_API_KEY environment variable is empty or contains only commas.')
-          }
-          apiKeyPool = new ApiKeyPool(keys, 'tavily')
-        }
-
-        const selectedKeyConfig = apiKeyPool.getNextKey()
-        if (!selectedKeyConfig) {
-          throw new Error('No active Tavily API keys available.')
-        }
-        const currentApiKey = selectedKeyConfig.key
-
-        try {
-          const tvly = tavily({
-            apiKey: currentApiKey,
-          })
-          const results = await tvly.search(query, {
-            maxResults: options.maxResults || 5,
-            searchDepth: runtimeConfig.public.tavilyAdvancedSearch ? 'advanced' : 'basic',
-            topic: runtimeConfig.public.tavilySearchTopic as ConfigWebSearch['tavilySearchTopic'],
-          })
-          apiKeyPool.markKeySuccess(currentApiKey)
-          return results.results
-            .filter((x: any) => !!x?.content && !!x.url)
-            .map((r: any) => ({
-              content: r.content,
-              url: r.url,
-              title: r.title,
-            }))
-        } catch (e) {
-          apiKeyPool.markKeyError(currentApiKey)
-          throw e
-        }
-      }
+    // tavily (default)
+    const pool = getOrCreateApiKeyPool(
+      apiKeyPool,
+      (next) => {
+        apiKeyPool = next
+      },
+      'tavily',
+      runtimeConfig,
+    )
+    const selectedKeyConfig = pool.getNextKey()
+    if (!selectedKeyConfig) {
+      throw new Error('No active Tavily API keys available.')
+    }
+    const currentApiKey = selectedKeyConfig.key
+    try {
+      const results = await searchWeb(
+        { ...sharedConfig, provider: 'tavily', apiKey: currentApiKey },
+        query,
+        options,
+      )
+      pool.markKeySuccess(currentApiKey)
+      return results
+    } catch (e) {
+      if (options.signal?.aborted || isAbortError(e)) throw e
+      pool.markKeyError(currentApiKey)
+      throw e
     }
   }
 }

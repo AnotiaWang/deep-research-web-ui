@@ -16,27 +16,53 @@
           </div>
           <div class="mx-auto sm:ml-auto sm:mr-0 flex items-center gap-2">
             <GitHubButton />
-            <HistoryModal />
-            <ConfigManager ref="configManagerRef" />
+            <HistoryModal :disabled="isRunning" @load="loadHistoryItem" />
+            <ConfigManager />
             <ColorModeButton />
             <LangSwitcher />
           </div>
         </div>
 
         <i18n-t class="whitespace-pre-wrap" keypath="index.projectDescription" tag="p">
-          <UButton class="!p-0" variant="link" href="https://github.com/dzhng/deep-research" target="_blank">
+          <UButton
+            class="!p-0"
+            variant="link"
+            href="https://github.com/dzhng/deep-research"
+            target="_blank"
+          >
             dzhng/deep-research
           </UButton>
         </i18n-t>
 
-        <ResearchForm :is-loading-feedback="!!feedbackRef?.isLoading" ref="formRef" @submit="generateFeedback" />
+        <ResearchSessionStatus
+          :status="session.status"
+          :phase="session.phase"
+          :failure="session.failure"
+          @cancel="cancelActiveOperation"
+        />
+
+        <ResearchForm
+          v-model="form"
+          :is-loading-feedback="isFeedbackRunning"
+          :disabled="!canBeginFeedback"
+          :submit-disabled="!canBeginFeedback"
+          @submit="generateFeedback"
+        />
         <ResearchFeedback
-          :is-loading-search="!!deepResearchRef?.isLoading"
-          ref="feedbackRef"
+          ref="feedbackComponent"
+          v-model="feedback"
+          :is-loading-search="isResearchRunning"
+          :disabled="session.status !== 'awaiting-input'"
           @submit="startDeepSearch"
         />
-        <DeepResearch ref="deepResearchRef" @complete="handleResearchComplete" />
-        <ResearchReport ref="reportRef" @complete="handleReportComplete" />
+        <DeepResearch ref="deepResearch" :disabled="!canRetryResearch" @retry="retryResearchNode" />
+        <ResearchReport
+          ref="report"
+          :disabled="!canRegenerateReport"
+          :query="form.query"
+          :result="researchResult"
+          @regenerate="regenerateReport"
+        />
       </div>
     </UContainer>
     <AutoUpdateToast />
@@ -44,27 +70,29 @@
 </template>
 
 <script setup lang="ts">
-  import type ResearchForm from '@/components/ResearchForm.vue'
   import type ResearchFeedback from '@/components/ResearchFeedback.vue'
   import type DeepResearch from '@/components/DeepResearch/DeepResearch.vue'
   import type ResearchReport from '@/components/ResearchReport.vue'
-  import type ConfigManager from '@/components/ConfigManager.vue'
-  import type { ResearchInputData } from '@/components/ResearchForm.vue'
-  import type { ResearchFeedbackResult } from '@/components/ResearchFeedback.vue'
-  import type { ResearchResult } from '~~/lib/core/deep-research'
   import type { ResearchHistoryItem } from '~/types/history'
   import { useHistory } from '~/composables/useHistory'
-  import { feedbackInjectionKey, formInjectionKey, researchResultInjectionKey } from '@/constants/injection-keys'
+  import type {
+    ResearchFailure,
+    ResearchFeedbackResult,
+    ResearchInputData,
+    ResearchOperationLease,
+    ResearchPhase,
+    ResearchResult,
+  } from '~~/shared/types/research-session'
+  import { isTimeoutError } from '~~/shared/utils/abort'
 
   const runtimeConfig = useRuntimeConfig()
+  const { t } = useI18n()
   const version = runtimeConfig.public.version
   const isServerMode = runtimeConfig.public.serverMode
 
-  const configManagerRef = ref<InstanceType<typeof ConfigManager>>()
-  const formRef = ref<InstanceType<typeof ResearchForm>>()
-  const feedbackRef = ref<InstanceType<typeof ResearchFeedback>>()
-  const deepResearchRef = ref<InstanceType<typeof DeepResearch>>()
-  const reportRef = ref<InstanceType<typeof ResearchReport>>()
+  const feedbackRef = useTemplateRef<InstanceType<typeof ResearchFeedback>>('feedbackComponent')
+  const deepResearchRef = useTemplateRef<InstanceType<typeof DeepResearch>>('deepResearch')
+  const reportRef = useTemplateRef<InstanceType<typeof ResearchReport>>('report')
 
   const form = ref<ResearchInputData>({
     query: '',
@@ -77,74 +105,241 @@
     learnings: [],
   })
 
-  provide(formInjectionKey, form)
-  provide(feedbackInjectionKey, feedback)
-  provide(researchResultInjectionKey, researchResult)
+  const {
+    state: session,
+    isRunning,
+    canBeginFeedback,
+    canRetryResearch,
+    canRegenerateReport,
+    beginFeedback,
+    completeFeedback,
+    beginResearch,
+    beginResearchRetry,
+    failResearchRetry,
+    completeResearch,
+    beginReport,
+    completeReport,
+    failOperation,
+    requestCancellation,
+    completeCancellation,
+    timeoutOperation,
+    loadHistory,
+    isCurrentOperation,
+  } = useResearchSession()
+  const { addHistoryItem, updateHistoryItem } = useHistory()
+  const operationRuntime = useResearchOperationRuntime({
+    timeouts: {
+      feedback: runtimeConfig.public.researchFeedbackTimeoutMs,
+      research: runtimeConfig.public.researchResearchTimeoutMs,
+      report: runtimeConfig.public.researchReportTimeoutMs,
+    },
+    onTimeout(lease, phase) {
+      timeoutOperation(lease, phase, t('researchSession.timeoutMessage'))
+    },
+  })
 
-  async function generateFeedback() {
-    feedbackRef.value?.getFeedback()
+  const isFeedbackRunning = computed(
+    () => session.value.status === 'running' && session.value.phase === 'feedback',
+  )
+  const isResearchRunning = computed(
+    () => session.value.status === 'running' && session.value.phase === 'research',
+  )
+  function operationGuard(lease: ResearchOperationLease) {
+    return () => isCurrentOperation(lease.sessionId, lease.operationId)
+  }
+
+  function toFailure(phase: ResearchPhase, error: unknown): ResearchFailure {
+    const message = error instanceof Error ? error.message : String(error)
+    const isNetworkError =
+      error instanceof TypeError || message.toLowerCase().includes('failed to fetch')
+    return {
+      phase,
+      code: isNetworkError ? 'network' : 'unknown',
+      message,
+      retryable: true,
+    }
+  }
+
+  function finishWithError(lease: ResearchOperationLease, phase: ResearchPhase, error: unknown) {
+    if (isTimeoutError(error)) {
+      timeoutOperation(lease, phase, t('researchSession.timeoutMessage'))
+    } else {
+      failOperation(lease, toFailure(phase, error))
+    }
+  }
+
+  async function generateFeedback(input: ResearchInputData) {
+    const lease = beginFeedback({ ...input })
+    if (!lease) return
+    const signal = operationRuntime.start(lease, 'feedback')
+
+    deepResearchRef.value?.clear()
+    reportRef.value?.displayReport('')
+    researchResult.value = { learnings: [] }
+    try {
+      const result = await feedbackRef.value?.getFeedback({
+        input: lease.input,
+        isCurrent: operationGuard(lease),
+        signal,
+      })
+      if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
+      if (!result) throw new Error(t('researchSession.noFeedback'))
+      completeFeedback(lease, result)
+    } catch (error) {
+      finishWithError(lease, 'feedback', error)
+    } finally {
+      operationRuntime.finish(lease)
+    }
   }
 
   async function startDeepSearch() {
-    deepResearchRef.value?.startResearch()
-  }
+    const lease = beginResearch(feedback.value)
+    if (!lease) return
+    const signal = operationRuntime.start(lease, 'research')
 
-  async function generateReport() {
-    reportRef.value?.generateReport()
-  }
-
-  async function handleResearchComplete() {
-    // 研究完成后立即保存历史记录（包含完整数据）
-    const { addHistoryItem } = useHistory()
-    if (researchResult.value.learnings.length > 0) {
-      addHistoryItem({
-        title: form.value.query,
-        query: form.value.query,
-        breadth: form.value.breadth,
-        depth: form.value.depth,
-        numQuestions: form.value.numQuestions,
-        feedback: [...feedback.value],
-        learnings: [...researchResult.value.learnings],
-        report: '', // 初始为空，将在报告生成后通过 complete 事件更新
+    try {
+      const result = await deepResearchRef.value?.startResearch({
+        input: lease.input,
+        feedback: lease.feedback,
+        isCurrent: operationGuard(lease),
+        signal,
       })
-    }
+      if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
+      if (!result?.learnings.length) throw new Error(t('researchSession.noLearnings'))
+      researchResult.value = {
+        learnings: result.learnings.map((item) => ({ ...item })),
+      }
 
-    // 触发报告生成
-    await generateReport()
+      const historyItem = addHistoryItem({
+        title: lease.input.query,
+        query: lease.input.query,
+        breadth: lease.input.breadth,
+        depth: lease.input.depth,
+        numQuestions: lease.input.numQuestions,
+        feedback: lease.feedback.map((item) => ({ ...item })),
+        learnings: result.learnings.map((item) => ({ ...item })),
+        report: '',
+        graph: deepResearchRef.value?.exportGraph(),
+      })
+      const reportLease = completeResearch(lease, result, historyItem.id)
+      operationRuntime.finish(lease)
+      if (reportLease) await runReport(reportLease)
+    } catch (error) {
+      finishWithError(lease, 'research', error)
+    } finally {
+      operationRuntime.finish(lease)
+    }
   }
 
-  function handleReportComplete(report: string) {
-    // 报告生成完成后更新历史记录
-    const { updateHistoryItem, findHistoryItemByQuery } = useHistory()
-    const existingItem = findHistoryItemByQuery(form.value.query)
-    if (existingItem) {
-      updateHistoryItem(existingItem.id, {
-        report,
-        learnings: [...researchResult.value.learnings],
-        feedback: [...feedback.value],
+  async function runReport(lease: ResearchOperationLease) {
+    const historyId = session.value.historyId
+    const signal = operationRuntime.start(lease, 'report')
+    try {
+      const report = await reportRef.value?.generateReport({
+        input: lease.input,
+        feedback: lease.feedback,
+        result: lease.result,
+        isCurrent: operationGuard(lease),
+        signal,
       })
+      if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
+      if (!report) throw new Error(t('researchSession.noReport'))
+
+      if (historyId) {
+        updateHistoryItem(historyId, {
+          report,
+          learnings: lease.result.learnings.map((item) => ({ ...item })),
+          feedback: lease.feedback.map((item) => ({ ...item })),
+        })
+      }
+      completeReport(lease, report)
+    } catch (error) {
+      finishWithError(lease, 'report', error)
+    } finally {
+      operationRuntime.finish(lease)
     }
+  }
+
+  async function retryResearchNode(nodeId: string) {
+    let historyId = session.value.historyId
+    const lease = beginResearchRetry()
+    if (!lease) return
+    const signal = operationRuntime.start(lease, 'research')
+
+    try {
+      const result = await deepResearchRef.value?.retryNode(nodeId, {
+        input: lease.input,
+        feedback: lease.feedback,
+        isCurrent: operationGuard(lease),
+        signal,
+      })
+      if (!isCurrentOperation(lease.sessionId, lease.operationId)) return
+      if (!result?.learnings.length) throw new Error(t('researchSession.noLearnings'))
+
+      researchResult.value = {
+        learnings: result.learnings.map((item) => ({ ...item })),
+      }
+      reportRef.value?.displayReport('')
+      const historyUpdates = {
+        learnings: result.learnings.map((item) => ({ ...item })),
+        feedback: lease.feedback.map((item) => ({ ...item })),
+        report: '',
+        graph: deepResearchRef.value?.exportGraph(),
+      }
+      if (historyId) {
+        updateHistoryItem(historyId, historyUpdates)
+      } else {
+        historyId = addHistoryItem({
+          title: lease.input.query,
+          query: lease.input.query,
+          breadth: lease.input.breadth,
+          depth: lease.input.depth,
+          numQuestions: lease.input.numQuestions,
+          ...historyUpdates,
+        }).id
+      }
+      const reportLease = completeResearch(lease, result, historyId)
+      operationRuntime.finish(lease)
+      if (reportLease) await runReport(reportLease)
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        timeoutOperation(lease, 'research', t('researchSession.timeoutMessage'))
+      } else {
+        failResearchRetry(lease)
+      }
+    } finally {
+      operationRuntime.finish(lease)
+    }
+  }
+
+  function cancelActiveOperation() {
+    const lease = operationRuntime.currentLease()
+    if (!lease || !requestCancellation(lease)) return
+    operationRuntime.cancel(lease)
+    completeCancellation(lease)
+  }
+
+  async function regenerateReport() {
+    const lease = beginReport()
+    if (lease) await runReport(lease)
   }
 
   function loadHistoryItem(item: ResearchHistoryItem) {
-    // 加载历史记录
+    if (!loadHistory(item)) return
+    feedbackRef.value?.clear()
+    reportRef.value?.displayReport('')
+
     form.value = {
       query: item.query,
       breadth: item.breadth,
       depth: item.depth,
       numQuestions: item.numQuestions,
     }
-
-    feedback.value = [...item.feedback]
+    feedback.value = item.feedback.map((entry) => ({ ...entry }))
     researchResult.value = {
-      learnings: [...item.learnings],
+      learnings: item.learnings.map((learning) => ({ ...learning })),
     }
-
-    // 如果历史记录中有报告，直接显示，不重新生成
-    if (item.report && reportRef.value) {
-      nextTick(() => {
-        reportRef.value?.displayReport(item.report)
-      })
-    }
+    deepResearchRef.value?.importGraph(item.graph)
+    reportRef.value?.displayReport(item.report || '')
   }
 </script>

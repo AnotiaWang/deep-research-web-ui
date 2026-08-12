@@ -32,8 +32,8 @@
       case 'search_complete':
         result.icon = 'i-lucide-search-check'
         break
-      case 'processing_serach_result':
-      case 'processing_serach_result_reasoning':
+      case 'processing_search_result':
+      case 'processing_search_result_reasoning':
         result.icon = 'i-lucide-brain'
         result.pulse = true
         break

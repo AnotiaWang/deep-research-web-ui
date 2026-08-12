@@ -81,6 +81,8 @@
     "depthHelp": "联网搜索的迭代轮数。",
     "breadth": "研究广度 (Breadth)",
     "breadthHelp": "第一次迭代中的搜索次数。后续每轮迭代的搜索次数为上一轮的一半。",
+    "required": "此项为必填项。",
+    "integerRange": "请输入 {min} 到 {max} 之间的整数。",
     "start": "开始研究",
     "researching": "研究中..."
   },
@@ -89,7 +91,8 @@
     "description": "AI 将会跟你确认一些细节，帮助你明确研究方向。",
     "waiting": "等待模型反馈...",
     "submit": "提交回答",
-    "noQuestions": "模型没有返回任何问题，请重试",
+    "continue": "继续研究",
+    "noQuestions": "问题已经足够清晰，无需补充追问，可以直接继续。",
     "error": "获取反馈失败：{0}"
   },
   "webBrowsing": {
@@ -134,6 +137,13 @@
   },
   "fullscreen": "全屏",
   "exitFullscreen": "退出全屏",
+  "graphControls": {
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fitView": "适应画布",
+    "lockView": "锁定画布交互",
+    "unlockView": "解锁画布交互"
+  },
   "serverMode": {
     "title": "服务端模式",
     "description": "当前运行在服务端模式，所有配置由服务器提供，无需手动设置 API 密钥。",
@@ -161,8 +171,34 @@
     "breadth": "广度",
     "questions": "问题数"
   },
+  "researchSession": {
+    "status": {
+      "idle": "就绪",
+      "running": "进行中",
+      "awaiting-input": "等待回答",
+      "cancelling": "正在取消",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消",
+      "timed-out": "已超时"
+    },
+    "phase": {
+      "feedback": "模型反馈",
+      "research": "联网研究",
+      "report": "研究报告"
+    },
+    "noFeedback": "模型反馈没有返回问题。",
+    "noLearnings": "研究已结束，但没有生成结论。",
+    "noReport": "报告生成没有返回内容。",
+    "timeoutMessage": "操作已超过时间限制，你现在可以重试。"
+  },
   "common": {
     "delete": "删除",
-    "cancel": "取消"
+    "cancel": "取消",
+    "language": "语言",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "useLightTheme": "切换到浅色主题",
+    "useDarkTheme": "切换到深色主题"
   }
 }

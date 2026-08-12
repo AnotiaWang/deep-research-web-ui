@@ -5,15 +5,27 @@
     type ProcessedSearchResult,
     type ResearchStep,
   } from '~~/lib/core/deep-research'
-  import { feedbackInjectionKey, formInjectionKey, researchResultInjectionKey } from '~/constants/injection-keys'
-  import Flow, { type SearchNode, type SearchEdge } from './SearchFlow.vue'
-  import SearchFlow from './SearchFlow.vue'
+  import SearchFlow, { type SearchNode, type SearchEdge } from './SearchFlow.vue'
   import NodeDetail from './NodeDetail.vue'
   import { isChildNode, isParentNode, isRootNode } from '~/utils/tree-node'
   import { UCard, UModal, UButton } from '#components'
   import { useServerMode } from '~/composables/useServerMode'
+  import { collectResearchResult } from '~/utils/research-result'
+  import { resolveResearchRetryQuery } from '~/utils/research-retry'
+  import { createFlowNode } from '~/utils/research-graph'
+  import {
+    createResearchHistoryGraph,
+    restoreResearchHistoryGraph,
+  } from '~/utils/research-history-graph'
+  import { abortable } from '~~/shared/utils/abort'
+  import type { ResearchHistoryGraph, ResearchHistoryNodeStatus } from '~/types/history'
+  import type {
+    ResearchFeedbackSnapshot,
+    ResearchInputSnapshot,
+    ResearchResult,
+  } from '~~/shared/types/research-session'
 
-  export type DeepResearchNodeStatus = Exclude<ResearchStep['type'], 'complete'>
+  export type DeepResearchNodeStatus = ResearchHistoryNodeStatus
 
   export type DeepResearchNode = {
     id: string
@@ -32,8 +44,19 @@
     error?: string
   }
 
+  export interface StartResearchOptions {
+    input: ResearchInputSnapshot
+    feedback: ReadonlyArray<ResearchFeedbackSnapshot>
+    isCurrent: () => boolean
+    signal?: AbortSignal
+  }
+
+  const props = defineProps<{
+    disabled?: boolean
+  }>()
+
   const emit = defineEmits<{
-    (e: 'complete'): void
+    (e: 'retry', nodeId: string): void
   }>()
 
   const toast = useToast()
@@ -42,7 +65,7 @@
   const isLargeScreen = useMediaQuery('(min-width: 768px)')
   const { deepResearch: researchFunction } = useServerMode()
 
-  const flowRef = ref<InstanceType<typeof Flow>>()
+  const flowRef = ref<InstanceType<typeof SearchFlow>>()
   const rootNode: DeepResearchNode = { id: '0', label: 'Start' }
   // The complete search data.
   // There's another tree stored in SearchNode.vue, with only basic data (id, status, ...)
@@ -63,12 +86,7 @@
     }
   })
 
-  // Inject global data from index.vue
-  const form = inject(formInjectionKey)!
-  const feedback = inject(feedbackInjectionKey)!
-  const completeResult = inject(researchResultInjectionKey)!
-
-  function handleResearchProgress(step: ResearchStep) {
+  function handleResearchProgress(step: ResearchStep): ResearchResult | undefined {
     let node: DeepResearchNode | undefined
     let nodeId = ''
 
@@ -147,14 +165,14 @@
         break
       }
 
-      case 'processing_serach_result_reasoning': {
+      case 'processing_search_result_reasoning': {
         if (node) {
           node.generateLearningsReasoning = (node.generateLearningsReasoning ?? '') + step.delta
         }
         break
       }
 
-      case 'processing_serach_result': {
+      case 'processing_search_result': {
         if (node) {
           node.learnings = step.result.learnings || []
         }
@@ -185,12 +203,11 @@
 
       case 'complete':
         console.log(`[DeepResearch] complete:`, step)
-        completeResult.value = {
+        const result = {
           learnings: step.learnings,
         }
-        emit('complete')
         isLoading.value = false
-        break
+        return result
     }
   }
 
@@ -205,16 +222,44 @@
 
   // The default root node for SearchFlow
   function flowRootNode(): SearchNode {
-    return {
-      id: '0',
-      data: { title: 'Start' },
-      position: { x: 0, y: 0 },
-      type: 'search', // We only have this type
-    }
+    return createFlowNode('0', { title: 'Start' })
   }
 
-  async function startResearch(retryNode?: DeepResearchNode) {
-    if (!form.value.query || !form.value.breadth || !form.value.depth) return
+  interface ResearchGraphSnapshot {
+    nodes: DeepResearchNode[]
+    selectedNodeId: string | undefined
+    searchResults: Record<string, PartialProcessedSearchResult>
+    flowNodes: SearchNode[]
+    flowEdges: SearchEdge[]
+  }
+
+  function snapshotResearchGraph(): ResearchGraphSnapshot {
+    return structuredClone({
+      nodes: toRaw(nodes.value),
+      selectedNodeId: selectedNodeId.value,
+      searchResults: toRaw(searchResults.value),
+      flowNodes: toRaw(flowNodes.value),
+      flowEdges: toRaw(flowEdges.value),
+    })
+  }
+
+  function restoreResearchGraph(snapshot: ResearchGraphSnapshot) {
+    nodes.value = snapshot.nodes
+    selectedNodeId.value = snapshot.selectedNodeId
+    searchResults.value = snapshot.searchResults
+    flowNodes.value = snapshot.flowNodes
+    flowEdges.value = snapshot.flowEdges
+    nextTick(() => flowRef.value?.reset())
+  }
+
+  let activeResearch = 0
+
+  async function startResearch(options: StartResearchOptions, retryNode?: DeepResearchNode) {
+    const { input, feedback: feedbackSnapshot } = options
+    if (!input.query || !input.breadth || !input.depth) return
+    const researchId = ++activeResearch
+    const isCurrent = options.isCurrent
+    let result: ResearchResult | undefined
 
     // Clear all nodes if it's not a retry
     if (!retryNode) {
@@ -230,17 +275,18 @@
       })
     }
 
-    // Wait after the flow is cleared
-    await new Promise((r) => requestAnimationFrame(r))
-
     try {
-      let query = getCombinedQuery(form.value, feedback.value)
+      // Wait after the flow is cleared
+      await abortable(new Promise((resolve) => requestAnimationFrame(resolve)), options.signal)
+
+      const originalQuery = getCombinedQuery(input, [...feedbackSnapshot])
+      let query = originalQuery
       let existingLearnings: ProcessedSearchResult['learnings'] = []
       let currentDepth = 1
-      let breadth = form.value.breadth
+      let breadth = input.breadth
 
       if (retryNode) {
-        query = retryNode.label
+        query = resolveResearchRetryQuery(originalQuery, retryNode)
         // Set the search depth and breadth to its parent's
         if (!isRootNode(retryNode.id)) {
           const parentId = parentNodeId(retryNode.id)!
@@ -254,28 +300,46 @@
 
       await researchFunction({
         query,
+        originalQuery,
         retryNode,
         currentDepth,
         breadth,
         aiConfig: config.ai,
-        maxDepth: form.value.depth,
+        maxDepth: input.depth,
         languageCode: locale.value,
         searchLanguageCode: config.webSearch.searchLanguage,
         learnings: existingLearnings,
-        onProgress: handleResearchProgress,
+        signal: options.signal,
+        onProgress: (step) => {
+          if (!isCurrent()) return
+          result = handleResearchProgress(step) ?? result
+        },
       })
+      if (!isCurrent()) return
+      if (retryNode) {
+        if (retryNode.id !== '0' && !searchResults.value[retryNode.id]?.learnings?.length) {
+          return
+        }
+
+        return collectResearchResult(Object.values(searchResults.value))
+      }
+      return result
     } catch (error) {
+      if (!isCurrent()) return
       console.error('Research failed:', error)
+      if (options) throw error
     } finally {
-      if (!retryNode) {
+      if (!retryNode && researchId === activeResearch) {
         isLoading.value = false
       }
     }
   }
 
-  async function retryNode(nodeId: string) {
+  async function retryNode(nodeId: string, options: StartResearchOptions) {
     console.log('[DeepResearch] retryNode', nodeId, isLoading.value)
     if (!nodeId || isLoading.value) return
+
+    const graphSnapshot = snapshotResearchGraph()
 
     // Remove all child nodes first
     nodes.value = nodes.value.filter((n) => !isChildNode(nodeId, n.id))
@@ -304,7 +368,53 @@
       })
     }
 
-    await startResearch(nodeCurrentData)
+    try {
+      const result = await startResearch(options, nodeCurrentData)
+      if (!result?.learnings.length) restoreResearchGraph(graphSnapshot)
+      return result
+    } catch (error) {
+      restoreResearchGraph(graphSnapshot)
+      throw error
+    }
+  }
+
+  function clear() {
+    activeResearch += 1
+    nodes.value = [{ ...rootNode }]
+    selectedNodeId.value = undefined
+    searchResults.value = {}
+    flowNodes.value = [flowRootNode()]
+    flowEdges.value = []
+    isLoading.value = false
+    nextTick(() => flowRef.value?.reset())
+  }
+
+  function exportGraph(): ResearchHistoryGraph {
+    return createResearchHistoryGraph(nodes.value, selectedNodeId.value)
+  }
+
+  function importGraph(graph?: ResearchHistoryGraph) {
+    activeResearch += 1
+    isLoading.value = false
+    isFullscreen.value = false
+
+    if (!graph?.nodes?.length) {
+      nodes.value = [{ ...rootNode }]
+      selectedNodeId.value = undefined
+      searchResults.value = {}
+      flowNodes.value = [flowRootNode()]
+      flowEdges.value = []
+      nextTick(() => flowRef.value?.reset())
+      return
+    }
+
+    const restored = restoreResearchHistoryGraph(graph)
+    nodes.value = restored.nodes
+    selectedNodeId.value = restored.selectedNodeId
+    searchResults.value = restored.searchResults
+    flowNodes.value = restored.flowNodes
+    flowEdges.value = restored.flowEdges
+    nextTick(() => flowRef.value?.reset())
   }
 
   let scrollY = 0
@@ -324,6 +434,10 @@
 
   defineExpose({
     startResearch,
+    retryNode,
+    clear,
+    exportGraph,
+    importGraph,
     isLoading,
   })
 </script>
@@ -339,7 +453,13 @@
           </p>
         </div>
         <UTooltip :text="t('exitFullscreen')" :delay-duration="100">
-          <UButton icon="i-material-symbols:fullscreen-exit" variant="ghost" color="info" @click="toggleFullscreen" />
+          <UButton
+            icon="i-material-symbols:fullscreen-exit"
+            variant="ghost"
+            color="info"
+            :aria-label="t('exitFullscreen')"
+            @click="toggleFullscreen"
+          />
         </UTooltip>
       </div>
     </template>
@@ -363,7 +483,11 @@
             isLargeScreen ? 'border-l w-1/3' : 'h-1/2 pt-2',
           ]"
         >
-          <NodeDetail :node="selectedNode" @retry="retryNode" />
+          <NodeDetail
+            :node="selectedNode"
+            :disabled="props.disabled"
+            @retry="emit('retry', $event)"
+          />
         </div>
       </div>
     </template>
@@ -381,7 +505,13 @@
           </p>
         </div>
         <UTooltip :text="t('fullscreen')" :delay-duration="100">
-          <UButton icon="i-material-symbols:fullscreen" variant="ghost" color="info" @click="toggleFullscreen" />
+          <UButton
+            icon="i-material-symbols:fullscreen"
+            variant="ghost"
+            color="info"
+            :aria-label="t('fullscreen')"
+            @click="toggleFullscreen"
+          />
         </UTooltip>
       </div>
     </template>
@@ -393,7 +523,12 @@
         :selected-node-id="selectedNodeId"
         @node-click="selectNode"
       />
-      <NodeDetail v-if="selectedNode" :node="selectedNode" @retry="retryNode" />
+      <NodeDetail
+        v-if="selectedNode"
+        :node="selectedNode"
+        :disabled="props.disabled"
+        @retry="emit('retry', $event)"
+      />
     </div>
   </UCard>
 </template>

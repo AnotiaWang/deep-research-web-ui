@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-app",
+  "name": "deep-research-web-ui",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,9 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "format": "prettier --write app server lib shared",
-    "lint": "prettier --check app server lib shared"
+    "lint": "prettier --check app server lib shared",
+    "test": "node --experimental-strip-types --import ./test/register-aliases.mjs --test \"test/**/*.test.ts\" \"lib/**/*.test.ts\"",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^0.1.16",
@@ -32,6 +34,7 @@
     "@vue-flow/controls": "^1.1.2",
     "@vue-flow/core": "^1.45.0",
     "ai": "^4.1.63",
+    "dompurify": "^3.4.12",
     "js-tiktoken": "^1.0.19",
     "marked": "^15.0.7",
     "nuxt": "^4.0.3",
@@ -48,6 +51,8 @@
   "devDependencies": {
     "@vueuse/core": "^13.0.0",
     "@vueuse/nuxt": "^13.0.0",
-    "prettier": "^3.5.3"
+    "prettier": "^3.5.3",
+    "typescript": "5.8.3",
+    "vue-tsc": "3.0.4"
   }
 }

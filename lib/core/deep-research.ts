@@ -3,19 +3,31 @@ import { z } from 'zod'
 import { parseStreamingJson, type DeepPartial } from '~~/shared/utils/json'
 
 import { trimPrompt } from '../ai/providers'
-import { languagePrompt, systemPrompt } from '../prompt'
+import {
+  languagePrompt,
+  learningExtractorSystemPrompt,
+  reportSystemPrompt,
+  resolveResponseLanguage,
+  searchPlannerSystemPrompt,
+} from '../prompt'
 import zodToJsonSchema from 'zod-to-json-schema'
 import { throwAiError } from '~~/shared/utils/errors'
+import type { ResearchResult } from '~~/shared/types/research-session'
+import { normalizeGeneratedSearchQueries } from '~~/shared/utils/search-query'
+import {
+  escapePromptAttribute,
+  finalizeLearningsFromSearchResults,
+} from '~~/shared/utils/search-learning'
+import { abortable, isAbortError, throwIfAborted } from '~~/shared/utils/abort'
 
-export type ResearchResult = {
-  learnings: ProcessedSearchResult['learnings']
-}
+export type { ResearchResult } from '~~/shared/types/research-session'
 
 export interface WriteFinalReportParams {
   prompt: string
   learnings: ProcessedSearchResult['learnings']
   language: string
   aiConfig: ConfigAi
+  signal?: AbortSignal
 }
 
 // Used for streaming response
@@ -41,13 +53,13 @@ export type ResearchStep =
   | { type: 'searching'; query: string; nodeId: string }
   | { type: 'search_complete'; results: WebSearchResult[]; nodeId: string }
   | {
-      type: 'processing_serach_result'
+      type: 'processing_search_result'
       query: string
       result: PartialProcessedSearchResult
       nodeId: string
     }
   | {
-      type: 'processing_serach_result_reasoning'
+      type: 'processing_search_result_reasoning'
       delta: string
       nodeId: string
     }
@@ -74,13 +86,17 @@ export const searchQueriesTypeSchema = z.object({
 // take an user query, return a list of SERP queries
 export function generateSearchQueries({
   query,
+  originalQuery,
   numQueries = 3,
   learnings,
   language,
   searchLanguage,
   aiConfig,
+  signal,
 }: {
   query: string
+  /** Root user goal; kept when generating deeper follow-up queries */
+  originalQuery?: string
   language: string
   numQueries?: number
   // optional, if provided, the research will continue from the last learning
@@ -88,43 +104,59 @@ export function generateSearchQueries({
   /** Force the LLM to generate serp queries in a certain language */
   searchLanguage?: string
   aiConfig: ConfigAi
+  signal?: AbortSignal
 }) {
+  throwIfAborted(signal)
   const schema = z.object({
     queries: z
       .array(
         z
           .object({
-            query: z.string().describe('The SERP query.'),
+            query: z.string().describe('Concrete SERP query string.'),
             researchGoal: z
               .string()
               .describe(
-                'First talk about the goal of the research that this query is meant to accomplish, then go deeper into how to advance the research once the results are found, mention additional research directions. Be as specific as possible, especially for additional research directions. JSON reserved words should be escaped.',
+                'What this query should uncover, and one specific next step after results arrive.',
               ),
           })
           .required({ query: true, researchGoal: true }),
       )
-      .describe(`List of SERP queries, max of ${numQueries}`),
+      .describe(`SERP queries, maximum ${numQueries}`),
   })
   const jsonSchema = JSON.stringify(zodToJsonSchema(schema))
   let lp = languagePrompt(language)
 
   if (searchLanguage && searchLanguage !== language) {
-    lp += ` Use ${searchLanguage} for the SERP queries.`
+    lp += ` Write each "query" field in ${resolveResponseLanguage(searchLanguage)}. Keep "researchGoal" in the response language.`
   }
+
+  const rootQuery = originalQuery?.trim()
+  const focusBlock =
+    rootQuery && rootQuery !== query.trim()
+      ? [
+          `Original user research goal:`,
+          `<original_query>${rootQuery}</original_query>`,
+          `Current research focus (generate queries for this focus while staying aligned with the original goal):`,
+          `<prompt>${query}</prompt>`,
+        ].join('\n')
+      : `User research prompt:\n<prompt>${query}</prompt>`
+
   const prompt = [
-    `Given the following prompt from the user, generate a list of highly effective Google search queries to research the topic. Return a maximum of ${numQueries} queries, but feel free to return less if the original prompt is clear. Make sure each query is creative, unique and not similar to each other: <prompt>${query}</prompt>`,
-    learnings
-      ? `Here are some learnings from previous research, use them to generate more specific queries: ${learnings.join(
-          '\n',
-        )}`
+    `Generate up to ${numQueries} highly effective web search queries for the topic below. Return fewer when the focus is already narrow. Each query must be specific, mutually distinct, and useful for a search engine (concrete entities, time ranges, comparisons, or facets). Prefer precision over clever wording. Operators like site:, filetype:, or quoted phrases are allowed when helpful.`,
+    focusBlock,
+    learnings?.length
+      ? `Learnings from previous research — use them to go deeper and avoid repeating the same angles:\n${learnings.map((item) => `- ${item}`).join('\n')}`
       : '',
     `You MUST respond in JSON matching this JSON schema: ${jsonSchema}`,
     lp,
-  ].join('\n\n')
+  ]
+    .filter(Boolean)
+    .join('\n\n')
   return streamText({
     model: getLanguageModel(aiConfig),
-    system: systemPrompt(),
+    system: searchPlannerSystemPrompt(),
     prompt,
+    abortSignal: signal,
     onError({ error }) {
       throwAiError('generateSearchQueries', error)
     },
@@ -145,67 +177,93 @@ export const searchResultTypeSchema = z.object({
 
 function processSearchResult({
   query,
+  researchGoal,
   results,
   numLearnings = 5,
   numFollowUpQuestions = 3,
   language,
   aiConfig,
+  signal,
 }: {
   query: string
+  researchGoal?: string
   results: WebSearchResult[]
   language: string
   numLearnings?: number
   numFollowUpQuestions?: number
   aiConfig: ConfigAi
+  signal?: AbortSignal
 }) {
+  throwIfAborted(signal)
+  const allowedUrls = results.map((item) => item.url)
   const schema = z.object({
     learnings: z
       .array(
         z.object({
-          url: z.string().describe('The source URL from which this learning was extracted'),
+          url: z.string().describe('Source URL copied exactly from the provided contents list'),
           learning: z
             .string()
             .describe(
-              'A detailed, information-dense insight extracted from the search results. Include specific entities, metrics, numbers, and dates when available',
+              'Information-dense insight grounded in that URL. Include entities, metrics, numbers, and dates when present.',
             ),
         }),
       )
-      .describe(
-        `Collection of key learnings extracted from search results, each with its source URL. Maximum of ${numLearnings} learnings.`,
-      ),
+      .describe(`Key learnings, up to ${numLearnings}`),
     followUpQuestions: z
       .array(z.string())
       .describe(
-        `List of relevant follow-up questions to explore the topic further, designed to uncover additional insights. Maximum of ${numFollowUpQuestions} questions.`,
+        `Follow-up research directions that fill gaps left by these results, up to ${numFollowUpQuestions}`,
       ),
   })
   const jsonSchema = JSON.stringify(zodToJsonSchema(schema))
   const contents = results.map((item) => trimPrompt(item.content, aiConfig.contextSize))
   const prompt = [
-    `Given the following contents from a SERP search for the query <query>${query}</query>, extract ${numLearnings} key learnings from the contents. Make sure each learning is unique and not similar to each other. The learnings should be as detailed and information dense as possible. Include any entities like people, places, companies, products, things, etc in the learnings, as well as any exact metrics, numbers, or dates. Also generate up to ${numFollowUpQuestions} follow-up questions that could help explore this topic further.`,
+    `From the SERP contents for <query>${query}</query>, extract up to ${numLearnings} unique, information-dense learnings. Do not aim for a fixed count if fewer high-quality insights exist.`,
+    researchGoal
+      ? `Research goal for this query:\n<research_goal>${researchGoal}</research_goal>`
+      : '',
+    `Rules:
+- Each learning must be grounded in the provided contents.
+- Each "url" MUST be copied exactly from this allow-list: ${JSON.stringify(allowedUrls)}
+- Never invent or rewrite URLs.
+- Prefer people, organizations, products, metrics, numbers, and dates over generic statements.
+- Also generate up to ${numFollowUpQuestions} follow-up questions that target remaining gaps or contradictions.`,
     `<contents>${contents
-      .map((content, index) => `<content url="${results[index]!.url}">\n${content}\n</content>`)
+      .map(
+        (content, index) =>
+          `<content url="${escapePromptAttribute(results[index]!.url)}">\n${content}\n</content>`,
+      )
       .join('\n')}</contents>`,
     `You MUST respond in JSON matching this JSON schema: ${jsonSchema}`,
     languagePrompt(language),
-  ].join('\n\n')
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 
   return streamText({
     model: getLanguageModel(aiConfig),
-    system: systemPrompt(),
+    system: learningExtractorSystemPrompt(),
     prompt,
+    abortSignal: signal,
     onError({ error }) {
       throwAiError('processSearchResult', error)
     },
   })
 }
 
-export function writeFinalReport({ prompt, learnings, language, aiConfig }: WriteFinalReportParams) {
+export function writeFinalReport({
+  prompt,
+  learnings,
+  language,
+  aiConfig,
+  signal,
+}: WriteFinalReportParams) {
+  throwIfAborted(signal)
   const learningsString = trimPrompt(
     learnings
       .map(
         (learning, index) =>
-          `<learning index="${index + 1}">
+          `<learning index="${index + 1}" url="${escapePromptAttribute(learning.url)}">
 ${learning.learning}
 </learning>`,
       )
@@ -213,31 +271,32 @@ ${learning.learning}
     aiConfig.contextSize,
   )
   const _prompt = [
-    `Given the following prompt from the user, write a final report on the topic using the learnings from research. Make it as detailed as possible, aim for 3 or more pages, include ALL the key insights from research.`,
+    `Write a final research report for the user prompt below, using only the provided learnings.`,
     `<prompt>${prompt}</prompt>`,
-    `Here are all the learnings from previous research:`,
+    `Learnings (citation index = the learning's index attribute):`,
     `<learnings>\n${learningsString}\n</learnings>`,
-    `Write the report using Markdown. Be factual, NEVER lie or make things up. Cite learnings from previous research when needed, using numbered citations like "[1]". Each citation should correspond to the index of the source in your learnings list. DO NOT include the actual URLs in the report text - only use the citation numbers.`,
+    `Requirements:
+- Markdown only. Target roughly 1,500–3,000 words unless the learnings cannot support that depth.
+- Be factual; never invent claims, numbers, or sources beyond the learnings. If the learnings block looks truncated, prioritize the densest remaining insights and note coverage limits.
+- Use numbered citations like [1] that match learning index values. Do not put raw URLs in the report body.
+- Prefer evidence over authority claims; call out conflicts and uncertainty explicitly.`,
     languagePrompt(language),
-    `## Deep Research Report`,
   ].join('\n\n')
 
   return streamText({
     model: getLanguageModel(aiConfig),
-    system: systemPrompt(),
+    system: reportSystemPrompt(),
     prompt: _prompt,
+    abortSignal: signal,
     onError({ error }) {
       throwAiError('writeFinalReport', error)
     },
   })
 }
 
-function childNodeId(parentNodeId: string, currentIndex: number) {
-  return `${parentNodeId}-${currentIndex}`
-}
-
 export async function deepResearch({
   query,
+  originalQuery,
   breadth,
   maxDepth,
   languageCode,
@@ -250,8 +309,11 @@ export async function deepResearch({
   retryNode,
   webSearchFunction,
   pLimitInstance,
+  signal,
 }: {
   query: string
+  /** Root user goal preserved across recursive deep-research calls */
+  originalQuery?: string
   breadth: number
   maxDepth: number
   /** The language of generated response */
@@ -268,11 +330,17 @@ export async function deepResearch({
   /** The Node ID to retry. Passed from DeepResearch.vue */
   retryNode?: any
   onProgress: (step: ResearchStep) => void
-  webSearchFunction: (query: string, options: { maxResults?: number; lang?: string }) => Promise<WebSearchResult[]>
+  webSearchFunction: (
+    query: string,
+    options: { maxResults?: number; lang?: string; signal?: AbortSignal },
+  ) => Promise<WebSearchResult[]>
   pLimitInstance?: any
+  signal?: AbortSignal
 }) {
+  throwIfAborted(signal)
   const language = languageCode
   const searchLanguage = searchLanguageCode
+  const rootQuery = originalQuery ?? query
 
   // Use provided pLimit or create a simple one if not provided
   const limit = pLimitInstance || {
@@ -280,6 +348,10 @@ export async function deepResearch({
       return fn()
     },
     concurrency: 2,
+  }
+  const progress = (step: ResearchStep) => {
+    throwIfAborted(signal)
+    onProgress(step)
   }
 
   try {
@@ -300,11 +372,13 @@ export async function deepResearch({
     else {
       const searchQueriesResult = generateSearchQueries({
         query,
+        originalQuery: rootQuery,
         learnings: learnings?.map((item) => item.learning),
         numQueries: breadth,
         language,
         searchLanguage,
         aiConfig,
+        signal,
       })
 
       for await (const chunk of parseStreamingJson(
@@ -312,18 +386,11 @@ export async function deepResearch({
         searchQueriesTypeSchema,
         (value) => !!value.queries?.length && !!value.queries[0]?.query,
       )) {
+        throwIfAborted(signal)
         if (chunk.type === 'object' && chunk.value.queries) {
-          // Temporary fix: Exclude queries that equals `undefined`
-          // Currently only being reported to be seen on GPT-4o, where the model simply returns `undefined` for certain questions
-          // https://github.com/AnotiaWang/deep-research-web-ui/issues/7
-          searchQueries = chunk.value.queries
-            .filter((q) => q.query !== 'undefined')
-            .map((q, i) => ({
-              ...q,
-              nodeId: childNodeId(nodeId, i),
-            }))
+          searchQueries = normalizeGeneratedSearchQueries(chunk.value.queries, nodeId)
           for (let i = 0; i < searchQueries.length; i++) {
-            onProgress({
+            progress({
               type: 'generating_query',
               result: searchQueries[i]!,
               nodeId: searchQueries[i]!.nodeId,
@@ -332,20 +399,20 @@ export async function deepResearch({
           }
         } else if (chunk.type === 'reasoning') {
           // Reasoning part goes to the parent node
-          onProgress({
+          progress({
             type: 'generating_query_reasoning',
             delta: chunk.delta,
             nodeId,
           })
         } else if (chunk.type === 'error') {
-          onProgress({
+          progress({
             type: 'error',
             message: chunk.message,
             nodeId,
           })
           break
         } else if (chunk.type === 'bad-end') {
-          onProgress({
+          progress({
             type: 'error',
             message: 'Invalid structured output',
             nodeId,
@@ -354,13 +421,13 @@ export async function deepResearch({
         }
       }
 
-      onProgress({
+      progress({
         type: 'node_complete',
         nodeId,
       })
 
       for (const searchQuery of searchQueries) {
-        onProgress({
+        progress({
           type: 'generated_query',
           query: searchQuery.query!,
           result: searchQuery,
@@ -373,28 +440,36 @@ export async function deepResearch({
     const results = await Promise.all(
       searchQueries.map((searchQuery) =>
         limit(async () => {
+          throwIfAborted(signal)
           if (!searchQuery?.query) {
             return {
               learnings: [],
             }
           }
-          onProgress({
+          progress({
             type: 'searching',
             query: searchQuery.query,
             nodeId: searchQuery.nodeId,
           })
           try {
             // search the web
-            const results = await webSearchFunction(searchQuery.query, {
-              maxResults: 5,
-              lang: languageCode,
-            })
+            const results = await abortable(
+              webSearchFunction(searchQuery.query, {
+                maxResults: 5,
+                lang: languageCode,
+                signal,
+              }),
+              signal,
+            )
+            throwIfAborted(signal)
             if (!results.length) {
               throw new Error('No search results found')
             }
-            console.log(`[DeepResearch] Searched "${searchQuery.query}", found ${results.length} contents`)
+            console.log(
+              `[DeepResearch] Searched "${searchQuery.query}", found ${results.length} contents`,
+            )
 
-            onProgress({
+            progress({
               type: 'search_complete',
               results,
               nodeId: searchQuery.nodeId,
@@ -404,10 +479,12 @@ export async function deepResearch({
 
             const searchResultGenerator = processSearchResult({
               query: searchQuery.query,
+              researchGoal: searchQuery.researchGoal,
               results,
               numFollowUpQuestions: nextBreadth,
               language,
               aiConfig,
+              signal,
             })
             let searchResult: PartialProcessedSearchResult = {}
 
@@ -416,29 +493,30 @@ export async function deepResearch({
               searchResultTypeSchema,
               (value) => !!value.learnings?.length,
             )) {
+              throwIfAborted(signal)
               if (chunk.type === 'object') {
                 searchResult = chunk.value
-                onProgress({
-                  type: 'processing_serach_result',
+                progress({
+                  type: 'processing_search_result',
                   result: chunk.value,
                   query: searchQuery.query,
                   nodeId: searchQuery.nodeId,
                 })
               } else if (chunk.type === 'reasoning') {
-                onProgress({
-                  type: 'processing_serach_result_reasoning',
+                progress({
+                  type: 'processing_search_result_reasoning',
                   delta: chunk.delta,
                   nodeId: searchQuery.nodeId,
                 })
               } else if (chunk.type === 'error') {
-                onProgress({
+                progress({
                   type: 'error',
                   message: chunk.message,
                   nodeId: searchQuery.nodeId,
                 })
                 break
               } else if (chunk.type === 'bad-end') {
-                onProgress({
+                progress({
                   type: 'error',
                   message: 'Invalid structured output',
                   nodeId: searchQuery.nodeId,
@@ -447,17 +525,14 @@ export async function deepResearch({
               }
             }
             console.log(`Processed search result for ${searchQuery.query}`, searchResult)
-            // Assign URL titles to learnings
-            searchResult.learnings = searchResult.learnings?.map((learning) => {
-              return {
-                ...learning,
-                title: results.find((r) => r.url === learning.url)?.title,
-              }
-            })
+            searchResult.learnings = finalizeLearningsFromSearchResults(
+              searchResult.learnings,
+              results,
+            )
             const allLearnings = [...(learnings ?? []), ...(searchResult.learnings ?? [])]
             const nextDepth = currentDepth + 1
 
-            onProgress({
+            progress({
               type: 'node_complete',
               result: {
                 learnings: searchResult.learnings ?? [],
@@ -467,28 +542,33 @@ export async function deepResearch({
             })
 
             if (nextDepth <= maxDepth && searchResult.followUpQuestions?.length) {
+              throwIfAborted(signal)
               console.warn(`Researching deeper, breadth: ${nextBreadth}, depth: ${nextDepth}`)
 
-              const nextQuery = `
-              Previous research goal: ${searchQuery.researchGoal}
-              Follow-up research directions: ${searchResult.followUpQuestions.map((q) => `\n${q}`).join('')}
-            `.trim()
+              const nextQuery = [
+                `Previous research goal: ${searchQuery.researchGoal}`,
+                `Follow-up research directions:`,
+                ...searchResult.followUpQuestions.map((q) => `- ${q}`),
+              ].join('\n')
 
               // Add concurrency by 1, and do next recursive search
               limit.concurrency++
               try {
                 const r = await deepResearch({
                   query: nextQuery,
+                  originalQuery: rootQuery,
                   breadth: nextBreadth,
                   maxDepth,
                   learnings: allLearnings,
-                  onProgress,
+                  onProgress: progress,
                   currentDepth: nextDepth,
                   nodeId: searchQuery.nodeId,
                   languageCode,
+                  searchLanguageCode,
                   aiConfig,
                   webSearchFunction,
                   pLimitInstance: limit,
+                  signal,
                 })
                 return r
               } catch (error) {
@@ -502,8 +582,9 @@ export async function deepResearch({
               }
             }
           } catch (e: any) {
+            if (signal?.aborted || isAbortError(e)) throw e
             console.error(`Error in node ${searchQuery.nodeId} for query ${searchQuery.query}`, e)
-            onProgress({
+            progress({
               type: 'error',
               message: e.message,
               nodeId: searchQuery.nodeId,
@@ -515,6 +596,7 @@ export async function deepResearch({
         }),
       ),
     )
+    throwIfAborted(signal)
     // Conclude results
     // Deduplicate
     const urlMap = new Map<string, true>()
@@ -530,7 +612,7 @@ export async function deepResearch({
     }
     // Complete should only be called once
     if (nodeId === '0') {
-      onProgress({
+      progress({
         type: 'complete',
         learnings: finalLearnings,
       })
@@ -539,8 +621,9 @@ export async function deepResearch({
       learnings: finalLearnings,
     }
   } catch (error: any) {
+    if (signal?.aborted || isAbortError(error)) throw error
     console.error(error)
-    onProgress({
+    progress({
       type: 'error',
       message: error?.message ?? 'Something went wrong',
       nodeId,

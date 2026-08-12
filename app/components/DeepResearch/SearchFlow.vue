@@ -3,10 +3,22 @@
   import '@vue-flow/core/dist/theme-default.css'
   import '@vue-flow/controls/dist/style.css'
   import SearchNode from './SearchNode.vue'
-  import { type Edge, type FlowEvents, type Node, VueFlow, useVueFlow, getNodesInside } from '@vue-flow/core'
+  import {
+    type Edge,
+    type FlowEvents,
+    type Node,
+    VueFlow,
+    useVueFlow,
+    getNodesInside,
+  } from '@vue-flow/core'
   import { Background } from '@vue-flow/background'
-  import { Controls } from '@vue-flow/controls'
+  import { ControlButton, Controls } from '@vue-flow/controls'
   import type { DeepResearchNodeStatus } from './DeepResearch.vue'
+  import {
+    createFlowEdge,
+    createFlowNode,
+    removeDescendantFlowElements,
+  } from '~/utils/research-graph'
 
   export interface SearchNodeData {
     title: string
@@ -27,6 +39,7 @@
   const nodes = defineModel<SearchNode[]>('nodes', { required: true })
   const edges = defineModel<SearchEdge[]>('edges', { required: true })
 
+  const { t } = useI18n()
   const isLargeScreen = useMediaQuery('(min-width: 768px)')
   const {
     addNodes: addFlowNodes,
@@ -35,10 +48,32 @@
     fitView,
     viewport,
     vueFlowRef,
+    zoomIn,
+    zoomOut,
+    setInteractive,
+    nodesDraggable,
+    nodesConnectable,
+    elementsSelectable,
+    minZoom,
+    maxZoom,
   } = useVueFlow()
   const { layout } = useNodeLayout()
 
   let hasUserInteraction = false
+  const minZoomReached = computed(() => viewport.value.zoom <= minZoom.value)
+  const maxZoomReached = computed(() => viewport.value.zoom >= maxZoom.value)
+  const isInteractive = computed(
+    () => nodesDraggable.value || nodesConnectable.value || elementsSelectable.value,
+  )
+
+  function fitGraph() {
+    hasUserInteraction = false
+    fitView({ maxZoom: 1.4 })
+  }
+
+  function toggleInteraction() {
+    setInteractive(!isInteractive.value)
+  }
 
   function handleNodeClick(nodeId: string) {
     emit('node-click', nodeId)
@@ -72,19 +107,10 @@
   }
 
   function addNode(nodeId: string, data: SearchNodeData, parentId?: string) {
-    addFlowNodes({
-      id: nodeId,
-      data,
-      position: { ...{ x: 0, y: 0 } },
-      type: 'search',
-    })
+    addFlowNodes(createFlowNode(nodeId, data))
 
     if (parentId) {
-      addFlowEdges({
-        id: `e:${parentId}:${nodeId}`,
-        source: parentId,
-        target: nodeId,
-      })
+      addFlowEdges(createFlowEdge(parentId, nodeId))
     }
 
     layoutGraph()
@@ -100,17 +126,10 @@
     hasUserInteraction = false
   }
 
-  function isChildNode(parentId: string, childId: string) {
-    return childId.length > parentId.length && childId.startsWith(parentId)
-  }
-
   function removeChildNodes(parentId: string) {
-    const childNodes = nodes.value.filter((n) => isChildNode(parentId, n.id))
-    childNodes.forEach((node) => {
-      // 移除节点和相关的边
-      nodes.value = nodes.value.filter((n) => n.id !== node.id)
-      edges.value = edges.value.filter((e) => e.source !== node.id && e.target !== node.id)
-    })
+    const next = removeDescendantFlowElements(nodes.value, edges.value, parentId)
+    nodes.value = next.nodes
+    edges.value = next.edges
   }
 
   function handleDrag(e: PointerEvent | FlowEvents['move']) {
@@ -153,7 +172,40 @@
           />
         </template>
         <Background />
-        <Controls @fit-view="hasUserInteraction = false" />
+        <Controls :show-zoom="false" :show-fit-view="false" :show-interactive="false">
+          <ControlButton
+            :aria-label="t('graphControls.zoomIn')"
+            :title="t('graphControls.zoomIn')"
+            :disabled="maxZoomReached"
+            @click="zoomIn()"
+          >
+            <UIcon class="size-3" name="i-lucide-plus" />
+          </ControlButton>
+          <ControlButton
+            :aria-label="t('graphControls.zoomOut')"
+            :title="t('graphControls.zoomOut')"
+            :disabled="minZoomReached"
+            @click="zoomOut()"
+          >
+            <UIcon class="size-3" name="i-lucide-minus" />
+          </ControlButton>
+          <ControlButton
+            :aria-label="t('graphControls.fitView')"
+            :title="t('graphControls.fitView')"
+            @click="fitGraph"
+          >
+            <UIcon class="size-3" name="i-lucide-scan" />
+          </ControlButton>
+          <ControlButton
+            :aria-label="
+              isInteractive ? t('graphControls.lockView') : t('graphControls.unlockView')
+            "
+            :title="isInteractive ? t('graphControls.lockView') : t('graphControls.unlockView')"
+            @click="toggleInteraction"
+          >
+            <UIcon class="size-3" :name="isInteractive ? 'i-lucide-lock-open' : 'i-lucide-lock'" />
+          </ControlButton>
+        </Controls>
       </VueFlow>
     </div>
   </ClientOnly>

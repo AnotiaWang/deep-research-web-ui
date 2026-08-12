@@ -77,6 +77,8 @@
     "depthHelp": "Aantal iteraties.",
     "breadth": "Breedte",
     "breadthHelp": "Aantal zoekopdrachten in de eerste iteratie. De zoekbreedte van elke iteratie is de helft van de vorige.",
+    "required": "Dit veld is verplicht.",
+    "integerRange": "Voer een geheel getal van {min} tot {max} in.",
     "start": "Begin Onderzoek",
     "researching": "Onderzoeken..."
   },
@@ -85,8 +87,9 @@
     "description": "De AI stelt u een aantal vervolgvragen om de onderzoeksrichting te verduidelijken.",
     "waiting": "Wachten op feedback van het model...",
     "submit": "Antwoord versturen",
+    "continue": "Onderzoek voortzetten",
     "error": "Fout bij het ontvangen van feedback: {0}",
-    "noQuestions": "Het model heeft geen vervolgvragen geretourneerd."
+    "noQuestions": "Je vraag is al duidelijk genoeg. Er zijn geen vervolgvragen nodig — je kunt doorgaan."
   },
   "webBrowsing": {
     "title": "3. Zoeken op het Internet",
@@ -130,6 +133,13 @@
   },
   "exitFullscreen": "Volledig scherm verlaten",
   "fullscreen": "Volledig scherm",
+  "graphControls": {
+    "zoomIn": "Inzoomen",
+    "zoomOut": "Uitzoomen",
+    "fitView": "Diagram passend weergeven",
+    "lockView": "Diagraminteractie vergrendelen",
+    "unlockView": "Diagraminteractie ontgrendelen"
+  },
   "serverMode": {
     "title": "Servermodus",
     "description": "Momenteel draait in servermodus. Alle configuraties worden door de server geleverd, geen handmatige API-sleutels nodig.",
@@ -157,8 +167,34 @@
     "breadth": "Breedte",
     "questions": "Vragen"
   },
+  "researchSession": {
+    "status": {
+      "idle": "Gereed",
+      "running": "Bezig",
+      "awaiting-input": "Wachten op antwoorden",
+      "cancelling": "Annuleren",
+      "completed": "Voltooid",
+      "failed": "Mislukt",
+      "cancelled": "Geannuleerd",
+      "timed-out": "Time-out"
+    },
+    "phase": {
+      "feedback": "modelfeedback",
+      "research": "webonderzoek",
+      "report": "rapport"
+    },
+    "noFeedback": "De modelfeedback bevatte geen vragen.",
+    "noLearnings": "Het onderzoek is zonder resultaten voltooid.",
+    "noReport": "Het rapport bevatte geen inhoud.",
+    "timeoutMessage": "De bewerking heeft de tijdslimiet overschreden. Je kunt het nu opnieuw proberen."
+  },
   "common": {
     "delete": "Verwijderen",
-    "cancel": "Annuleren"
+    "cancel": "Annuleren",
+    "language": "Taal",
+    "showPassword": "Wachtwoord tonen",
+    "hidePassword": "Wachtwoord verbergen",
+    "useLightTheme": "Licht thema gebruiken",
+    "useDarkTheme": "Donker thema gebruiken"
   }
 }

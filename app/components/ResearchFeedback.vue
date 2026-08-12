@@ -1,19 +1,27 @@
 <script setup lang="ts">
-  import { feedbackInjectionKey, formInjectionKey } from '~/constants/injection-keys'
   import { useServerMode } from '~/composables/useServerMode'
+  import { hasMeaningfulFeedbackQuestions, mergeFeedbackQuestions } from '~/utils/feedback'
+  import type {
+    ResearchFeedbackResult,
+    ResearchInputSnapshot,
+  } from '~~/shared/types/research-session'
 
-  export interface ResearchFeedbackResult {
-    assistantQuestion: string
-    userAnswer: string
+  export interface GetFeedbackOptions {
+    input: ResearchInputSnapshot
+    isCurrent: () => boolean
+    signal?: AbortSignal
   }
 
   const props = defineProps<{
     isLoadingSearch?: boolean
+    disabled?: boolean
   }>()
 
   defineEmits<{
     (e: 'submit'): void
   }>()
+
+  const feedback = defineModel<ResearchFeedbackResult[]>({ required: true })
 
   const { t, locale } = useI18n()
   const { showConfigManager, isConfigValid, config } = storeToRefs(useConfigStore())
@@ -25,22 +33,28 @@
   const reasoningContent = ref('')
   const isLoading = ref(false)
   const error = ref('')
+  /** True after a feedback request finished successfully (including zero questions). */
+  const feedbackReady = ref(false)
 
-  // Inject global data from index.vue
-  const form = inject(formInjectionKey)!
-  const feedback = inject(feedbackInjectionKey)!
+  const isSubmitButtonDisabled = computed(() => {
+    if (isLoading.value || props.isLoadingSearch || props.disabled || !feedbackReady.value) {
+      return true
+    }
+    if (!Array.isArray(feedback.value)) return true
+    // Empty list means the model judged the query clear enough to proceed.
+    if (!feedback.value.length) return false
+    return feedback.value.some((v) => !v.assistantQuestion || !v.userAnswer)
+  })
 
-  const isSubmitButtonDisabled = computed(
-    () =>
-      !feedback.value.length ||
-      // All questions should be answered
-      feedback.value.some((v) => !v.assistantQuestion || !v.userAnswer) ||
-      // Should not be loading
-      isLoading.value ||
-      props.isLoadingSearch,
-  )
+  let activeRequest = 0
 
-  async function getFeedback() {
+  async function getFeedback(options: GetFeedbackOptions) {
+    const requestId = ++activeRequest
+    const { input, signal } = options
+    const isCurrent = options.isCurrent
+    clear()
+    activeRequest = requestId
+
     if (!isConfigValid.value && !isServerMode.value) {
       toast.add({
         title: t('index.missingConfigTitle'),
@@ -48,60 +62,68 @@
         color: 'error',
       })
       showConfigManager.value = true
-      return
+      throw new Error(t('index.missingConfigDescription'))
     }
-    clear()
     isLoading.value = true
     try {
       const chunks = await feedbackFunction({
-        query: form.value.query,
-        numQuestions: form.value.numQuestions,
+        query: input.query,
+        numQuestions: input.numQuestions,
         language: t('language', {}, { locale: locale.value }),
         aiConfig: config.value.ai,
+        signal,
       })
 
       for await (const chunk of chunks) {
+        if (!isCurrent()) return
         if (chunk.type === 'reasoning') {
           reasoningContent.value += chunk.delta
         } else if (chunk.type === 'error') {
           error.value = chunk.message
         } else if (chunk.type === 'object') {
-          const questions = chunk.value.questions!.filter((s: any) => typeof s === 'string')
-          // Incrementally update modelValue
-          for (let i = 0; i < questions.length; i += 1) {
-            if (feedback.value[i]) {
-              feedback.value[i]!.assistantQuestion = questions[i]!
-            } else {
-              feedback.value.push({
-                assistantQuestion: questions[i]!,
-                userAnswer: '',
-              })
-            }
-          }
+          feedback.value = mergeFeedbackQuestions(
+            Array.isArray(feedback.value) ? feedback.value : [],
+            chunk.value?.questions,
+          )
         } else if (chunk.type === 'bad-end') {
           error.value = t('invalidStructuredOutput')
         }
       }
-      console.log(`[ResearchFeedback] query: ${form.value.query}, feedback:`, feedback.value)
-      // Check if model returned questions
-      if (!feedback.value.length) {
-        error.value = t('modelFeedback.noQuestions')
+      if (!isCurrent()) return
+      console.log(`[ResearchFeedback] query: ${input.query}, feedback:`, feedback.value)
+      if (error.value) {
+        feedback.value = []
+        throw new Error(error.value)
       }
+      // Placeholder-only streams are treated as invalid; a true empty list is OK
+      // only when the model explicitly returned {"questions":[]} (no bad-end).
+      if (!hasMeaningfulFeedbackQuestions(feedback.value)) {
+        feedback.value = []
+      }
+      feedbackReady.value = true
+      return (Array.isArray(feedback.value) ? feedback.value : []).map((item) => ({ ...item }))
     } catch (e: any) {
+      if (!isCurrent()) return
       console.error('Error getting feedback:', e)
       if (e.message?.includes('Failed to fetch')) {
         e.message += `\n${t('error.requestBlockedByCORS')}`
       }
+      feedback.value = []
+      feedbackReady.value = false
       error.value = t('modelFeedback.error', [e.message])
+      throw e
     } finally {
-      isLoading.value = false
+      if (requestId === activeRequest) isLoading.value = false
     }
   }
 
   function clear() {
+    activeRequest += 1
     feedback.value = []
     error.value = ''
     reasoningContent.value = ''
+    isLoading.value = false
+    feedbackReady.value = false
   }
 
   defineExpose({
@@ -121,19 +143,32 @@
     </template>
 
     <div class="flex flex-col gap-2">
-      <div v-if="!feedback.length && !reasoningContent && !error">
+      <div v-if="!feedbackReady && !feedback.length && !reasoningContent && !error">
         {{ $t('modelFeedback.waiting') }}
       </div>
       <template v-else>
         <div v-if="error" class="text-red-500 whitespace-pre-wrap">
           {{ error }}
         </div>
+        <div
+          v-else-if="feedbackReady && !feedback.length"
+          class="text-sm text-gray-500 whitespace-pre-wrap"
+        >
+          {{ $t('modelFeedback.noQuestions') }}
+        </div>
 
         <ReasoningAccordion v-model="reasoningContent" :loading="isLoading" />
 
-        <div v-for="(feedback, index) in feedback" class="flex flex-col gap-2" :key="index">
-          {{ feedback.assistantQuestion }}
-          <UInput v-model="feedback.userAnswer" />
+        <div
+          v-for="(item, index) in feedback"
+          v-show="item.assistantQuestion"
+          class="flex flex-col gap-2"
+          :key="index"
+        >
+          <label :for="`feedback-answer-${index}`">
+            {{ item.assistantQuestion }}
+          </label>
+          <UInput :id="`feedback-answer-${index}`" v-model="item.userAnswer" :disabled="disabled" />
         </div>
       </template>
       <UButton
@@ -143,7 +178,11 @@
         block
         @click="$emit('submit')"
       >
-        {{ $t('modelFeedback.submit') }}
+        {{
+          feedbackReady && !feedback.length
+            ? $t('modelFeedback.continue')
+            : $t('modelFeedback.submit')
+        }}
       </UButton>
     </div>
   </UCard>
