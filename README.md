@@ -16,7 +16,7 @@ Features:
 
 Currently available providers:
 
-- AI: OpenAI compatible, SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Ollama and more
+- AI: OpenAI compatible, [ApiSmart](https://www.apismart.ai), SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Ollama and more
 - Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE
 
 Please give a 🌟 Star if you like this project!
@@ -33,10 +33,10 @@ Please give a 🌟 Star if you like this project!
 
 ---
 
-<a href="https://www.swiftproxy.net/?ref=Anotia" target="_blank">Swiftproxy</a> provides high-quality residential proxies for web scraping, browser automation, AI workflows, and multi-account management. Promo code: `PROXY90` - 10% off.
+<a href="https://www.apismart.ai/" target="_blank">ApiSmart.ai</a> provides unified access to leading AI models through a single API. Use one API key to connect with LLM, image, and video models through an OpenAI-compatible interface, without managing multiple providers separately. Switch models easily, simplify billing, and improve reliability with intelligent routing and automatic failover. Build and scale AI applications faster with one streamlined API platform.
 
-<a href="https://www.swiftproxy.net/?ref=Anotia" target="_blank">
-<img width="500" alt="Swiftproxy" src="https://github.com/user-attachments/assets/c70bd420-4cd3-475a-9a18-5039d90fea32" />
+<a href="https://www.apismart.ai/" target="_blank">
+<img width="300" alt="ApiSmart" src="docs/sponsors/apismart-400.png" />
 </a>
 
 ---
