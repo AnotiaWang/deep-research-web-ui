@@ -106,7 +106,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 
 | Type | Supported values |
 |------|------------------|
-| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `deepseek`, `ollama` |
+| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `deepseek`, `ollama`, `litellm` |
 | Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse` |
 
 Notes:
@@ -116,6 +116,7 @@ Notes:
 - Firecrawl self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
 - fastCRW (`crw`) is a Firecrawl-compatible web scraper (single binary; self-host or cloud). It defaults to the cloud base `https://fastcrw.com/api` and reads the key from `NUXT_WEB_SEARCH_API_KEY` (document as `CRW_API_KEY`); self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
 - Ollama uses `http://localhost:11434/v1` as the default API base. When running the app inside Docker, `localhost` refers to the container itself, so set `NUXT_AI_API_BASE` to a reachable host or Docker network address if Ollama runs outside the container.
+- LiteLLM uses `http://localhost:4000/v1` as the default API base. Its API key is optional when the proxy does not require authentication; set `NUXT_AI_API_BASE` when the proxy is not reachable at the default local address.
 
 ---
 

@@ -3,6 +3,11 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { wrapLanguageModel, extractReasoningMiddleware } from 'ai'
 import type { LanguageModelV1 } from 'ai'
+import type { ConfigAi, ConfigAiProvider } from '../types/config'
+
+export function isAiApiKeyRequired(provider: ConfigAiProvider) {
+  return provider !== 'ollama' && provider !== 'litellm'
+}
 
 export function getLanguageModel(config: ConfigAi) {
   const apiBase = getApiBase(config)
