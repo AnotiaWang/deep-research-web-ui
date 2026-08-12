@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import { isAiApiKeyRequired } from '~~/shared/utils/ai-model'
+
   interface OpenAICompatibleModel {
     id: string
     object: string
@@ -8,7 +10,12 @@
     data: OpenAICompatibleModel[]
   }
 
-  const { config, aiApiBase, webSearchApiBase, showConfigManager: showModal } = storeToRefs(useConfigStore())
+  const {
+    config,
+    aiApiBase,
+    webSearchApiBase,
+    showConfigManager: showModal,
+  } = storeToRefs(useConfigStore())
   const { t } = useI18n()
   const runtimeConfig = useRuntimeConfig()
   const isServerMode = computed(() => runtimeConfig.public.serverMode)
@@ -82,6 +89,12 @@
       label: 'Ollama',
       value: 'ollama',
     },
+    {
+      label: 'LiteLLM',
+      value: 'litellm',
+      link: 'https://docs.litellm.ai/docs/',
+      linkText: 'docs.litellm.ai',
+    },
   ])
   const webSearchProviderOptions = computed(() => [
     {
@@ -118,7 +131,10 @@
     },
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
-  const selectedAiProvider = computed(() => aiProviderOptions.value.find((o) => o.value === config.value.ai.provider))
+  const selectedAiProvider = computed(() =>
+    aiProviderOptions.value.find((o) => o.value === config.value.ai.provider),
+  )
+  const aiApiKeyRequired = computed(() => isAiApiKeyRequired(config.value.ai.provider))
   const selectedWebSearchProvider = computed(() =>
     webSearchProviderOptions.value.find((o) => o.value === config.value.webSearch.provider),
   )
@@ -160,7 +176,12 @@
 
   // Automatically fetch AI models list
   watch(
-    () => [config.value.ai.provider, config.value.ai.apiKey, config.value.ai.apiBase, showModal.value],
+    () => [
+      config.value.ai.provider,
+      config.value.ai.apiKey,
+      config.value.ai.apiBase,
+      showModal.value,
+    ],
     () => {
       if (!showModal.value || isServerMode.value) return
       debouncedListAiModels()
@@ -200,7 +221,11 @@
 <template>
   <div>
     <UModal v-model:open="showModal" :title="$t('settings.title')">
-      <UButton icon="i-lucide-settings" />
+      <UButton
+        icon="i-lucide-settings"
+        :aria-label="$t('settings.title')"
+        :title="$t('settings.title')"
+      />
 
       <template #body>
         <UAccordion v-model="activeSections" type="multiple" :items="settingSections" collapsible>
@@ -208,8 +233,13 @@
           <template #ai>
             <div class="flex flex-col gap-y-2 mb-2">
               <UFormField>
-                <template v-if="selectedAiProvider?.help" #help>
-                  <i18n-t class="whitespace-pre-wrap" :keypath="selectedAiProvider.help" tag="span">
+                <template v-if="selectedAiProvider?.help || selectedAiProvider?.link" #help>
+                  <i18n-t
+                    v-if="selectedAiProvider.help"
+                    class="whitespace-pre-wrap"
+                    :keypath="selectedAiProvider.help"
+                    tag="span"
+                  >
                     <UButton
                       v-if="selectedAiProvider.link"
                       class="!p-0"
@@ -220,6 +250,15 @@
                       {{ selectedAiProvider.linkText || selectedAiProvider.link }}
                     </UButton>
                   </i18n-t>
+                  <UButton
+                    v-else-if="selectedAiProvider.link"
+                    class="!p-0"
+                    :to="selectedAiProvider.link"
+                    target="_blank"
+                    variant="link"
+                  >
+                    {{ selectedAiProvider.linkText || selectedAiProvider.link }}
+                  </UButton>
                 </template>
                 <USelect
                   v-model="config.ai.provider"
@@ -228,7 +267,7 @@
                   :disabled="isServerMode"
                 />
               </UFormField>
-              <UFormField :label="$t('settings.ai.apiKey')" :required="config.ai.provider !== 'ollama'">
+              <UFormField :label="$t('settings.ai.apiKey')" :required="aiApiKeyRequired">
                 <PasswordInput
                   v-model="config.ai.apiKey"
                   class="w-full"
@@ -237,7 +276,12 @@
                 />
               </UFormField>
               <UFormField :label="$t('settings.ai.apiBase')">
-                <UInput v-model="config.ai.apiBase" class="w-full" :placeholder="aiApiBase" :disabled="isServerMode" />
+                <UInput
+                  v-model="config.ai.apiBase"
+                  class="w-full"
+                  :placeholder="aiApiBase"
+                  :disabled="isServerMode"
+                />
               </UFormField>
               <UFormField :label="$t('settings.ai.model')" required>
                 <UInputMenu
@@ -281,8 +325,17 @@
             <div class="flex flex-col gap-y-2">
               <UFormField>
                 <template #help>
-                  <i18n-t v-if="selectedWebSearchProvider?.help" :keypath="selectedWebSearchProvider.help" tag="p">
-                    <UButton class="!p-0" :to="selectedWebSearchProvider.link" target="_blank" variant="link">
+                  <i18n-t
+                    v-if="selectedWebSearchProvider?.help"
+                    :keypath="selectedWebSearchProvider.help"
+                    tag="p"
+                  >
+                    <UButton
+                      class="!p-0"
+                      :to="selectedWebSearchProvider.link"
+                      target="_blank"
+                      variant="link"
+                    >
                       {{ selectedWebSearchProvider.link }}
                     </UButton>
                   </i18n-t>
@@ -294,7 +347,10 @@
                   :disabled="isServerMode"
                 />
               </UFormField>
-              <UFormField :label="$t('settings.webSearch.apiKey')" :required="!config.webSearch.apiBase">
+              <UFormField
+                :label="$t('settings.webSearch.apiKey')"
+                :required="!config.webSearch.apiBase"
+              >
                 <PasswordInput
                   v-model="config.webSearch.apiKey"
                   class="w-full"
@@ -304,7 +360,10 @@
               </UFormField>
 
               <template v-if="config.webSearch.provider === 'google-pse'">
-                <UFormField :label="$t('settings.webSearch.providers.google-pse.pseIdLabel')" required>
+                <UFormField
+                  :label="$t('settings.webSearch.providers.google-pse.pseIdLabel')"
+                  required
+                >
                   <UInput
                     v-model="config.webSearch.googlePseId"
                     class="w-full"
@@ -327,7 +386,11 @@
               </UFormField>
               <UFormField :label="$t('settings.webSearch.queryLanguage')">
                 <template #help>
-                  <i18n-t class="whitespace-pre-wrap" keypath="settings.webSearch.queryLanguageHelp" tag="p" />
+                  <i18n-t
+                    class="whitespace-pre-wrap"
+                    keypath="settings.webSearch.queryLanguageHelp"
+                    tag="p"
+                  />
                 </template>
                 <LangSwitcher
                   :value="config.webSearch.searchLanguage"
@@ -358,7 +421,10 @@
                   :label="$t('settings.webSearch.providers.tavily.advancedSearch')"
                   :help="$t('settings.webSearch.providers.tavily.advancedSearchHelp')"
                 >
-                  <USwitch v-model="config.webSearch.tavilyAdvancedSearch" :disabled="isServerMode" />
+                  <USwitch
+                    v-model="config.webSearch.tavilyAdvancedSearch"
+                    :disabled="isServerMode"
+                  />
                 </UFormField>
                 <UFormField
                   :label="$t('settings.webSearch.providers.tavily.searchTopic')"
@@ -383,7 +449,12 @@
           <p class="text-sm text-gray-500">
             {{ isServerMode ? $t('serverMode.configNotice') : $t('settings.disclaimer') }}
           </p>
-          <UButton v-if="!isServerMode" color="primary" icon="i-lucide-check" @click="showModal = false">
+          <UButton
+            v-if="!isServerMode"
+            color="primary"
+            icon="i-lucide-check"
+            @click="showModal = false"
+          >
             {{ $t('settings.save') }}
           </UButton>
         </div>

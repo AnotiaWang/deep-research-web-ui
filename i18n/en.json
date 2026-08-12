@@ -81,6 +81,8 @@
     "depthHelp": "Number of iterations.",
     "breadth": "Breadth",
     "breadthHelp": "Number of searches in the first iteration. The search width of each iteration is half of the previous one.",
+    "required": "This field is required.",
+    "integerRange": "Enter a whole number from {min} to {max}.",
     "start": "Start Research",
     "researching": "Researching..."
   },
@@ -89,8 +91,9 @@
     "description": "The AI will ask you some follow up questions to help you clarify the research direction.",
     "waiting": "Waiting for model feedback...",
     "submit": "Submit Answer",
+    "continue": "Continue Research",
     "error": "Error getting feedback: {0}",
-    "noQuestions": "The model did not return any follow-up questions."
+    "noQuestions": "Your query is already clear enough. No follow-up questions are needed — you can continue."
   },
   "webBrowsing": {
     "title": "3. Web Browsing",
@@ -134,6 +137,13 @@
   },
   "fullscreen": "Fullscreen",
   "exitFullscreen": "Exit fullscreen",
+  "graphControls": {
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitView": "Fit graph to view",
+    "lockView": "Lock graph interaction",
+    "unlockView": "Unlock graph interaction"
+  },
   "serverMode": {
     "title": "Server Mode",
     "description": "Currently running in server mode. All configurations are provided by the server, no need to set API keys manually.",
@@ -161,8 +171,34 @@
     "breadth": "Breadth",
     "questions": "Questions"
   },
+  "researchSession": {
+    "status": {
+      "idle": "Ready",
+      "running": "Running",
+      "awaiting-input": "Waiting for answers",
+      "cancelling": "Cancelling",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "timed-out": "Timed out"
+    },
+    "phase": {
+      "feedback": "model feedback",
+      "research": "web research",
+      "report": "report"
+    },
+    "noFeedback": "Feedback generation did not produce questions.",
+    "noLearnings": "Research completed without learnings.",
+    "noReport": "Report generation did not produce content.",
+    "timeoutMessage": "The operation exceeded its time limit. You can retry it now."
+  },
   "common": {
     "delete": "Delete",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "language": "Language",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "useLightTheme": "Use light theme",
+    "useDarkTheme": "Use dark theme"
   }
 }

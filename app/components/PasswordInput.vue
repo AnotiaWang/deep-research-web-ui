@@ -1,19 +1,27 @@
 <script setup lang="ts">
   const show = ref(false)
   const password = defineModel<string>()
+  const { t } = useI18n()
+  const inputId = useId()
 </script>
 
 <template>
-  <UInput v-model="password" :type="show ? 'text' : 'password'" :ui="{ trailing: 'pe-1' }">
+  <UInput
+    :id="inputId"
+    v-model="password"
+    :type="show ? 'text' : 'password'"
+    :ui="{ trailing: 'pe-1' }"
+  >
     <template #trailing>
       <UButton
         color="neutral"
         variant="link"
         size="sm"
         :icon="show ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-        :aria-label="show ? 'Hide' : 'Show'"
+        :aria-label="show ? t('common.hidePassword') : t('common.showPassword')"
         :aria-pressed="show"
-        aria-controls="password"
+        :aria-controls="inputId"
+        type="button"
         @click="show = !show"
       />
     </template>

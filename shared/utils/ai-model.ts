@@ -3,6 +3,11 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { wrapLanguageModel, extractReasoningMiddleware } from 'ai'
 import type { LanguageModelV1 } from 'ai'
+import type { ConfigAi, ConfigAiProvider } from '../types/config'
+
+export function isAiApiKeyRequired(provider: ConfigAiProvider) {
+  return provider !== 'ollama' && provider !== 'litellm'
+}
 
 export function getLanguageModel(config: ConfigAi) {
   const apiBase = getApiBase(config)
@@ -64,6 +69,9 @@ export function getApiBase(config: ConfigAi) {
   }
   if (config.provider === '302-ai') {
     return config.apiBase || 'https://api.302.ai/v1'
+  }
+  if (config.provider === 'litellm') {
+    return config.apiBase || 'http://localhost:4000/v1'
   }
   return config.apiBase || 'https://api.openai.com/v1'
 }

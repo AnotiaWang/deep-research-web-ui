@@ -21,6 +21,26 @@ Currently available providers:
 
 Please give a 🌟 Star if you like this project!
 
+---
+
+**Sponsors**
+
+<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">MangoProxy</a> provides Residential, ISP, Mobile, and Datacenter proxies in 200+ locations for web scraping, automation, SEO, and multi-account management. Promo code: `GITHUBISP` - 8% off Static ISP proxies.
+
+<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">
+<img width="500" alt="MangoProxy" src="https://github.com/user-attachments/assets/bef14f25-e95b-472a-985c-56ae7b116a10" />
+</a>
+
+---
+
+<a href="https://www.swiftproxy.net/?ref=Anotia" target="_blank">Swiftproxy</a> provides high-quality residential proxies for web scraping, browser automation, AI workflows, and multi-account management. Promo code: `PROXY90` - 10% off.
+
+<a href="https://www.swiftproxy.net/?ref=Anotia" target="_blank">
+<img width="500" alt="Swiftproxy" src="https://github.com/user-attachments/assets/c70bd420-4cd3-475a-9a18-5039d90fea32" />
+</a>
+
+---
+
 ## How to use
 
 Live demo: <a href="https://deep-research.ataw.top" target="_blank">https://deep-research.ataw.top</a>
@@ -106,7 +126,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 
 | Type | Supported values |
 |------|------------------|
-| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `deepseek`, `ollama` |
+| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
 | Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse` |
 
 Notes:
@@ -116,6 +136,8 @@ Notes:
 - Firecrawl self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
 - fastCRW (`crw`) is a Firecrawl-compatible web scraper (single binary; self-host or cloud). It defaults to the cloud base `https://fastcrw.com/api` and reads the key from `NUXT_WEB_SEARCH_API_KEY` (document as `CRW_API_KEY`); self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
 - Ollama uses `http://localhost:11434/v1` as the default API base. When running the app inside Docker, `localhost` refers to the container itself, so set `NUXT_AI_API_BASE` to a reachable host or Docker network address if Ollama runs outside the container.
+- LiteLLM uses `http://localhost:4000/v1` as the default API base. Its API key is optional when the proxy does not require authentication; set `NUXT_AI_API_BASE` when the proxy is not reachable at the default local address.
+- Requesty uses `https://router.requesty.ai/v1` as the default API base and expects model IDs in `provider/model` format, such as `openai/gpt-4o`.
 
 ---
 
