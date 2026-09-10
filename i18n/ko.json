@@ -64,6 +64,10 @@
           "apiKeyPlaceholder": "Google API 키를 입력하세요",
           "pseIdLabel": "프로그래밍 가능 검색 엔진 ID (cx)",
           "pseIdPlaceholder": "PSE ID(cx 값)를 입력하세요"
+        },
+        "youcom": {
+          "help": "You.com 검색 API를 통한 웹 검색. API 키 없이 사용할 수 있습니다(일일 할당량 제한); 더 높은 한도를 원하면 {0}에서 키를 발급받으세요.",
+          "apiKeyPlaceholder": "선택 사항 — 비워 두면 키 없는 무료 사용량이 적용됩니다"
         }
       },
       "concurrencyLimitHelp": "동시 검색 작업 수를 제한합니다. 검색 제공자에 과부하가 걸려 요청이 실패하는 것을 방지하는 데 유용합니다.",

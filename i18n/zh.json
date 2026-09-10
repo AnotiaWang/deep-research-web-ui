@@ -64,6 +64,10 @@
           "apiKeyPlaceholder": "输入你的 Google API 密钥",
           "pseIdLabel": "可编程搜索引擎 ID (cx)",
           "pseIdPlaceholder": "输入你的 PSE ID (cx 值)"
+        },
+        "youcom": {
+          "help": "通过 You.com 搜索 API 进行网页搜索。无需 API 密钥即可使用（每日配额有限）；在 {0} 获取密钥可获得更高限额。",
+          "apiKeyPlaceholder": "可选 — 留空则使用免密钥免费额度"
         }
       },
       "concurrencyLimit": "并发数",

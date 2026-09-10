@@ -18,7 +18,7 @@ Deep Research Web 能把一个研究问题变成一份带引用的报告：自�
 当前支持的供应商：
 
 - AI 服务：OpenAI compatible, SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM 等
-- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE
+- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）
 
 喜欢本项目请点 ⭐ 收藏！
 
@@ -119,7 +119,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | 类型 | 支持的值 |
 |------|----------|
 | AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse` |
+| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom` |
 
 说明：
 
@@ -127,6 +127,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 - Google PSE 需要同时配置 `NUXT_WEB_SEARCH_API_KEY` 和 `NUXT_PUBLIC_GOOGLE_PSE_ID`。
 - Firecrawl 自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - fastCRW（`crw`）是与 Firecrawl 兼容的网页抓取工具（单一二进制文件；可自托管或使用云服务）。默认使用云端地址 `https://fastcrw.com/api`，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（文档中记为 `CRW_API_KEY`）；自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
+- You.com（`youcom`）从 `NUXT_WEB_SEARCH_API_KEY` 读取密钥（可选，支持逗号分隔多密钥轮询）。未设置密钥时使用免密钥端点（每日配额有限）；可在 https://you.com/platform/api-keys 获取密钥。
 - Ollama 默认 API Base 为 `http://localhost:11434/v1`。如果应用运行在 Docker 容器内，`localhost` 指向容器自身；若 Ollama 运行在宿主机或其他容器中，请将 `NUXT_AI_API_BASE` 设置为容器可访问的宿主机地址或 Docker 网络地址。
 - LiteLLM 默认 API Base 为 `http://localhost:4000/v1`。当代理未启用认证时，API 密钥可以留空；如果代理无法通过默认本地地址访问，请设置 `NUXT_AI_API_BASE`。
 - Requesty 默认 API Base 为 `https://router.requesty.ai/v1`，模型 ID 使用 `provider/model` 格式，例如 `openai/gpt-4o`。

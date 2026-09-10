@@ -127,7 +127,17 @@
       label: 'Google PSE',
       value: 'google-pse',
       help: 'settings.webSearch.providers.google-pse.help',
+      // Only kept for easy reference in i18n Ally
+      _help: t('settings.webSearch.providers.google-pse.help'),
       link: 'https://programmablesearchengine.google.com/', // Link to Google PSE console
+    },
+    {
+      label: 'You.com',
+      value: 'youcom',
+      help: 'settings.webSearch.providers.youcom.help',
+      // Only kept for easy reference in i18n Ally
+      _help: t('settings.webSearch.providers.youcom.help'),
+      link: 'https://you.com/platform/api-keys',
     },
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
@@ -349,12 +359,16 @@
               </UFormField>
               <UFormField
                 :label="$t('settings.webSearch.apiKey')"
-                :required="!config.webSearch.apiBase"
+                :required="!config.webSearch.apiBase && config.webSearch.provider !== 'youcom'"
               >
                 <PasswordInput
                   v-model="config.webSearch.apiKey"
                   class="w-full"
-                  :placeholder="$t('settings.webSearch.apiKey')"
+                  :placeholder="
+                    config.webSearch.provider === 'youcom'
+                      ? $t('settings.webSearch.providers.youcom.apiKeyPlaceholder')
+                      : $t('settings.webSearch.apiKey')
+                  "
                   :disabled="isServerMode"
                 />
               </UFormField>

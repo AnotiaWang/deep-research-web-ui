@@ -42,6 +42,20 @@ export type WebSearchConfig = {
 
 const FIRECRAWL_DEFAULT_API_BASE = 'https://api.firecrawl.dev'
 const CRW_DEFAULT_API_BASE = 'https://fastcrw.com/api'
+const YOUCOM_KEYLESS_SEARCH_URL = 'https://api.you.com/v1/agents/search'
+const YOUCOM_KEYED_SEARCH_URL = 'https://ydc-index.io/v1/search'
+
+/** Single item from the You.com search API `results.web` / `results.news` arrays. */
+interface YoucomSearchResult {
+  url?: string
+  title?: string
+  /** Curated summary of the page. */
+  description?: string
+  /** Excerpts from the page itself. */
+  snippets?: string[]
+  /** Publication date, e.g. `2025-07-14T00:00:00`. */
+  page_age?: string
+}
 
 export function resolveWebSearchApiBase(
   provider: ConfigWebSearchProvider,
@@ -53,7 +67,7 @@ export function resolveWebSearchApiBase(
   if (provider === 'crw') {
     return apiBase || CRW_DEFAULT_API_BASE
   }
-  // tavily / google-pse do not use a configurable API base in this project
+  // tavily / google-pse / youcom do not use a configurable API base in this project
   return undefined
 }
 
@@ -103,6 +117,20 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
   } else if (domains) limits.push('domains')
   if (options.intent === 'news') limits.push('news')
   if (provider === 'google-pse') return { google, firecrawl: {}, tavily: {}, limitations: limits }
+  if (provider === 'youcom')
+    return {
+      // The You.com search endpoints have no native time/domain/language
+      // params; the response always includes a `news` section for
+      // news-intent queries, so only the other constraints are reported.
+      google: {},
+      firecrawl: {},
+      tavily: {},
+      limitations: [
+        ...(time || hasDates ? ['time' as const] : []),
+        ...(domains ? ['domains' as const] : []),
+        ...(options.lang ? ['language' as const] : []),
+      ],
+    }
   if (provider === 'crw')
     return {
       google: {},
@@ -254,6 +282,80 @@ async function searchWithTavily(
     }))
 }
 
+/**
+ * You.com Web Search API.
+ *
+ * Two endpoints, selected by the presence of an API key:
+ * - Keyed: `https://ydc-index.io/v1/search` with `X-API-Key` (higher limits)
+ * - Keyless: `https://api.you.com/v1/agents/search` (limited daily quota per
+ *   IP; returns 402 once exhausted, which we surface as an error)
+ *
+ * Response shape (`results.web` and, for news-intent queries, `results.news`):
+ * items carry `url`, `title`, `description`, `snippets` (excerpts) and
+ * `page_age`. `description` is a curated summary while `snippets` are page
+ * excerpts, so both are joined into the result content.
+ */
+async function searchWithYoucom(
+  config: WebSearchConfig,
+  query: string,
+  options: WebSearchOptions,
+): Promise<WebSearchResult[]> {
+  const usingKey = !!config.apiKey
+  const apiUrl = new URL(usingKey ? YOUCOM_KEYED_SEARCH_URL : YOUCOM_KEYLESS_SEARCH_URL)
+  apiUrl.searchParams.set('query', query)
+  apiUrl.searchParams.set('count', (options.maxResults ?? 5).toString())
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    // Pin identity encoding: the keyless endpoint can advertise gzip with
+    // body bytes that Node's decoder rejects.
+    'Accept-Encoding': 'identity',
+  }
+  if (usingKey) headers['X-API-Key'] = config.apiKey!
+
+  try {
+    const response = await abortable(fetch(apiUrl, { headers }), options.signal)
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`
+      try {
+        const body = (await response.json()) as { error?: { message?: string } }
+        if (body.error?.message) message = `${message}: ${body.error.message}`
+      } catch {
+        // Body is not JSON; keep the status-only message.
+      }
+      throw new Error(`You.com search failed (${usingKey ? 'keyed' : 'keyless'}): ${message}`)
+    }
+
+    const data = (await response.json()) as {
+      results?: {
+        web?: YoucomSearchResult[]
+        news?: YoucomSearchResult[]
+      }
+    }
+    const webResults = data.results?.web ?? []
+    const newsResults = data.results?.news ?? []
+
+    return [...webResults, ...newsResults]
+      .map((r) => {
+        const content = [r.description, ...(r.snippets ?? [])].filter(Boolean).join('\n').trim()
+        if (!r.url || !content) return undefined
+        return {
+          content,
+          sourceType: 'search-result' as const,
+          url: r.url,
+          title: r.title,
+          publishedAt: r.page_age,
+        }
+      })
+      .filter((r): r is WebSearchResult => !!r)
+  } catch (error: unknown) {
+    if (options.signal?.aborted || isAbortError(error)) throw error
+    console.error('You.com search failed:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`You.com Error: ${message}`)
+  }
+}
+
 /** Run a single web search with the given provider config. */
 export async function searchWeb(
   config: WebSearchConfig,
@@ -269,6 +371,8 @@ export async function searchWeb(
       return searchWithFirecrawlCompatible(config, query, options)
     case 'google-pse':
       return searchWithGooglePse(config, query, options)
+    case 'youcom':
+      return searchWithYoucom(config, query, options)
     case 'tavily':
     default:
       return searchWithTavily(config, query, options)

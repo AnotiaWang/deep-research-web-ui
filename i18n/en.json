@@ -64,6 +64,10 @@
           "apiKeyPlaceholder": "Enter your Google API Key",
           "pseIdLabel": "Programmable Search Engine ID (cx)",
           "pseIdPlaceholder": "Enter your PSE ID (cx value)"
+        },
+        "youcom": {
+          "help": "Web search via the You.com Search API. Works without an API key (limited daily quota); add a key at {0} for higher limits.",
+          "apiKeyPlaceholder": "Optional — leave empty for the keyless free tier"
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",

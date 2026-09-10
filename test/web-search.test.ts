@@ -324,3 +324,118 @@ it('scrapes Firecrawl markdown through the installed SDK using the configured AP
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 })
+
+describe('youcom provider', () => {
+  it('reports unsupported time/domain/language filters as limitations', () => {
+    const filters = buildSearchFilters('youcom', {
+      intent: 'news',
+      timeRange: 'week',
+      includeDomains: ['example.com'],
+      lang: 'en',
+    })
+    assert.deepEqual(filters.limitations, ['time', 'domains', 'language'])
+    assert.deepEqual(buildSearchFilters('youcom', {}).limitations, [])
+  })
+
+  it('sends the query through the keyless endpoint without auth headers', async () => {
+    const previous = globalThis.fetch
+    let requestedUrl: URL | undefined
+    let requestedHeaders: Record<string, string> = {}
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requestedUrl = new URL(String(input))
+      requestedHeaders = init?.headers ?? {}
+      return Response.json({
+        results: {
+          web: [
+            {
+              url: 'https://example.com/one',
+              title: 'Result one',
+              description: 'A curated summary',
+              snippets: ['An excerpt from the page'],
+              page_age: '2026-09-01T00:00:00',
+            },
+          ],
+          news: [
+            {
+              url: 'https://example.com/news',
+              title: 'Result news',
+              description: 'A news summary',
+            },
+          ],
+        },
+      })
+    }) as typeof fetch
+    try {
+      const notices: string[][] = []
+      const results = await searchWeb({ provider: 'youcom' }, 'AI product launches', {
+        maxResults: 7,
+        onNotice: (value) => notices.push(value),
+      })
+      assert.equal(requestedUrl?.hostname, 'api.you.com')
+      assert.equal(requestedUrl?.pathname, '/v1/agents/search')
+      assert.equal(requestedUrl?.searchParams.get('query'), 'AI product launches')
+      assert.equal(requestedUrl?.searchParams.get('count'), '7')
+      assert.equal(requestedHeaders['X-API-Key'], undefined)
+      assert.equal(results.length, 2)
+      assert.equal(results[0]?.content, 'A curated summary\nAn excerpt from the page')
+      assert.equal(results[0]?.publishedAt, '2026-09-01T00:00:00')
+      assert.equal(results[0]?.sourceType, 'search-result')
+      assert.equal(results[1]?.content, 'A news summary')
+      // onNotice fires even with no limitations (same as other providers).
+      assert.deepEqual(notices, [[]])
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+
+  it('uses the keyed endpoint with X-API-Key when a key is configured', async () => {
+    const previous = globalThis.fetch
+    let requestedUrl: URL | undefined
+    let requestedHeaders: Record<string, string> = {}
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requestedUrl = new URL(String(input))
+      requestedHeaders = init?.headers ?? {}
+      return Response.json({ results: { web: [] } })
+    }) as typeof fetch
+    try {
+      await searchWeb({ provider: 'youcom', apiKey: 'test-only' }, 'query')
+      assert.equal(requestedUrl?.hostname, 'ydc-index.io')
+      assert.equal(requestedUrl?.pathname, '/v1/search')
+      assert.equal(requestedHeaders['X-API-Key'], 'test-only')
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+
+  it('drops items without url or content and surfaces HTTP errors', async () => {
+    const previous = globalThis.fetch
+    globalThis.fetch = (async () =>
+      Response.json(
+        {
+          results: {
+            web: [
+              { title: 'No url', description: 'orphan' },
+              { url: 'https://example.com/empty', title: 'No text' },
+            ],
+          },
+        },
+        { status: 200 },
+      )) as typeof fetch
+    try {
+      assert.deepEqual(await searchWeb({ provider: 'youcom' }, 'query'), [])
+    } finally {
+      globalThis.fetch = previous
+    }
+
+    globalThis.fetch = (async () =>
+      new Response('Payment Required', { status: 402 })) as typeof fetch
+    try {
+      await assert.rejects(
+        () => searchWeb({ provider: 'youcom' }, 'query'),
+        /You.com search failed \(keyless\): HTTP 402/,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+})

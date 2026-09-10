@@ -60,6 +60,10 @@
           "apiKeyPlaceholder": "Voer uw Google API-sleutel in",
           "pseIdLabel": "Programmable Search Engine ID (cx)",
           "pseIdPlaceholder": "Voer uw PSE ID (cx-waarde) in"
+        },
+        "youcom": {
+          "help": "Zoeken op het web via de You.com Search API. Werkt zonder API-sleutel (beperkt dagelijks quotum); voeg een sleutel toe op {0} voor hogere limieten.",
+          "apiKeyPlaceholder": "Optioneel — laat leeg voor de gratis sleutelloze variant"
         }
       },
       "concurrencyLimitHelp": "Beperk de gelijktijdige zoektaken. Dit is handig om te voorkomen dat de zoekmachine overbelast raakt en verzoeken mislukken.",
