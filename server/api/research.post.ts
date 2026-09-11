@@ -268,7 +268,7 @@ function getOrCreateApiKeyPool(
   return next
 }
 
-function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFunction {
+export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFunction {
   const search: WebSearchFunction = async (query: string, options: WebSearchOptions) => {
     const provider = runtimeConfig.public.webSearchProvider as ConfigWebSearchProvider
     const sharedConfig = {
@@ -323,6 +323,9 @@ function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFunction 
     }
 
     if (provider === 'youcom') {
+      if (!runtimeConfig.webSearchApiKey?.trim()) {
+        return searchWeb({ ...sharedConfig, apiKey: undefined }, query, options)
+      }
       // You.com works keyless; when keys are configured, rotate them like
       // the other keyed providers (comma-separated NUXT_WEB_SEARCH_API_KEY).
       const pool = getOrCreateApiKeyPool(
@@ -334,9 +337,8 @@ function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFunction 
         runtimeConfig,
       )
       const selectedKeyConfig = pool.getNextKey()
-      // No keys configured (and pool empty): keyless endpoint, no rotation.
       if (!selectedKeyConfig) {
-        return searchWeb({ ...sharedConfig, apiKey: undefined }, query, options)
+        throw new Error('No active You.com API keys available.')
       }
       const currentApiKey = selectedKeyConfig.key
       try {

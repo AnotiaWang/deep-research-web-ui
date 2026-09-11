@@ -119,13 +119,13 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
   if (provider === 'google-pse') return { google, firecrawl: {}, tavily: {}, limitations: limits }
   if (provider === 'youcom')
     return {
-      // The You.com search endpoints have no native time/domain/language
-      // params; the response always includes a `news` section for
-      // news-intent queries, so only the other constraints are reported.
+      // This adapter does not apply native filters. A mixed web/news
+      // response does not enforce the caller's news intent.
       google: {},
       firecrawl: {},
       tavily: {},
       limitations: [
+        ...(options.intent === 'news' ? ['news' as const] : []),
         ...(time || hasDates ? ['time' as const] : []),
         ...(domains ? ['domains' as const] : []),
         ...(options.lang ? ['language' as const] : []),

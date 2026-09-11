@@ -326,14 +326,14 @@ it('scrapes Firecrawl markdown through the installed SDK using the configured AP
 })
 
 describe('youcom provider', () => {
-  it('reports unsupported time/domain/language filters as limitations', () => {
+  it('reports unsupported news/time/domain/language filters as limitations', () => {
     const filters = buildSearchFilters('youcom', {
       intent: 'news',
       timeRange: 'week',
       includeDomains: ['example.com'],
       lang: 'en',
     })
-    assert.deepEqual(filters.limitations, ['time', 'domains', 'language'])
+    assert.deepEqual(filters.limitations, ['news', 'time', 'domains', 'language'])
     assert.deepEqual(buildSearchFilters('youcom', {}).limitations, [])
   })
 
@@ -438,4 +438,26 @@ describe('youcom provider', () => {
       globalThis.fetch = previous
     }
   })
+})
+
+it('reports the news limitation when You.com returns only web results', async () => {
+  const previous = globalThis.fetch
+  globalThis.fetch = async () =>
+    Response.json({
+      results: {
+        web: [{ url: 'https://example.com/docs', description: 'Product documentation' }],
+        news: [],
+      },
+    })
+  try {
+    const notices: string[][] = []
+    const results = await searchWeb({ provider: 'youcom' }, 'Nuxt', {
+      intent: 'news',
+      onNotice: (value) => notices.push(value),
+    })
+    assert.equal(results.length, 1)
+    assert.deepEqual(notices, [['news']])
+  } finally {
+    globalThis.fetch = previous
+  }
 })
