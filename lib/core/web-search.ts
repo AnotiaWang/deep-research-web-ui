@@ -420,7 +420,12 @@ async function searchWithSerply(
   try {
     const doFetch = config.fetch ?? fetch
     const response = await doFetch(apiUrl, {
-      headers: { 'X-Api-Key': apiKey, Accept: 'application/json' },
+      headers: {
+        'X-Api-Key': apiKey,
+        Accept: 'application/json',
+        // Browsers drop this header; the server route sends it as-is.
+        'User-Agent': 'deep-research-web-ui',
+      },
       signal: options.signal,
     })
     // Error bodies from the edge may not be JSON.

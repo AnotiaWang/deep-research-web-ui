@@ -503,6 +503,7 @@ describe('serply provider', () => {
       assert.equal(requestedUrl?.searchParams.get('q'), 'nuxt (site:nuxt.com OR site:github.com)')
       assert.equal(requestedUrl?.searchParams.get('num'), '10')
       assert.equal(requestedHeaders['X-Api-Key'], 'test-only')
+      assert.equal(requestedHeaders['User-Agent'], 'deep-research-web-ui')
       assert.equal(results.length, 11)
       assert.deepEqual(results[0], {
         content: 'Snippet 0',
