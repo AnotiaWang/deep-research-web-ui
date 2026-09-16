@@ -64,6 +64,9 @@
         "youcom": {
           "help": "Zoeken op het web via de You.com Search API. Werkt zonder API-sleutel (beperkt dagelijks quotum); voeg een sleutel toe op {0} voor hogere limieten.",
           "apiKeyPlaceholder": "Optioneel — laat leeg voor de gratis sleutelloze variant"
+        },
+        "serply": {
+          "help": "Zoeken op het web via de Serply API (Google-resultaten). Vereist een API-sleutel; vraag er een aan op {0}."
         }
       },
       "concurrencyLimitHelp": "Beperk de gelijktijdige zoektaken. Dit is handig om te voorkomen dat de zoekmachine overbelast raakt en verzoeken mislukken.",

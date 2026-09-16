@@ -9,7 +9,13 @@ export type ConfigAiProvider =
   | 'ollama'
   | 'litellm'
 
-export type ConfigWebSearchProvider = 'tavily' | 'firecrawl' | 'crw' | 'google-pse' | 'youcom'
+export type ConfigWebSearchProvider =
+  | 'tavily'
+  | 'firecrawl'
+  | 'crw'
+  | 'google-pse'
+  | 'youcom'
+  | 'serply'
 
 export interface ConfigAi {
   provider: ConfigAiProvider

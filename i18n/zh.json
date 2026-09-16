@@ -68,6 +68,9 @@
         "youcom": {
           "help": "通过 You.com 搜索 API 进行网页搜索。无需 API 密钥即可使用（每日配额有限）；在 {0} 获取密钥可获得更高限额。",
           "apiKeyPlaceholder": "可选 — 留空则使用免密钥免费额度"
+        },
+        "serply": {
+          "help": "通过 Serply API 进行网页搜索（Google 结果）。需要 API 密钥，可在 {0} 获取。"
         }
       },
       "concurrencyLimit": "并发数",

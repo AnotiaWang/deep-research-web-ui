@@ -139,6 +139,14 @@
       _help: t('settings.webSearch.providers.youcom.help'),
       link: 'https://you.com/platform/api-keys',
     },
+    {
+      label: 'Serply',
+      value: 'serply',
+      help: 'settings.webSearch.providers.serply.help',
+      // Only kept for easy reference in i18n Ally
+      _help: t('settings.webSearch.providers.serply.help'),
+      link: 'https://serply.io',
+    },
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
   const selectedAiProvider = computed(() =>

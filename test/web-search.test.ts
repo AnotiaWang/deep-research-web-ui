@@ -461,3 +461,98 @@ it('reports the news limitation when You.com returns only web results', async ()
     globalThis.fetch = previous
   }
 })
+
+describe('serply provider', () => {
+  it('maps time, language and news to Google URL parameters and flags explicit dates', () => {
+    const filters = buildSearchFilters('serply', {
+      intent: 'news',
+      timeRange: 'week',
+      includeDomains: ['example.com'],
+      lang: 'zh',
+    })
+    assert.deepEqual(filters.serply, { tbs: 'qdr:w', lr: 'lang_zh-CN', tbm: 'nws' })
+    assert.deepEqual(filters.limitations, [])
+    const dated = buildSearchFilters('serply', { startDate: '2024-01-01', endDate: '2024-02-01' })
+    assert.deepEqual(dated.serply, {})
+    assert.deepEqual(dated.limitations, ['time'])
+  })
+
+  it('sends the key header, a site clause for domains, and clamps num to the API cap', async () => {
+    const previous = globalThis.fetch
+    let requestedUrl: URL | undefined
+    let requestedHeaders: Record<string, string> = {}
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requestedUrl = new URL(String(input))
+      requestedHeaders = init?.headers ?? {}
+      return Response.json({
+        results: Array.from({ length: 12 }, (_, index) => ({
+          title: `Result ${index}`,
+          link: `https://example.com/${index}`,
+          description: `Snippet ${index}`,
+          metadata: index === 0 ? { published_time: '2 days ago' } : {},
+        })),
+      })
+    }) as typeof fetch
+    try {
+      const results = await searchWeb({ provider: 'serply', apiKey: 'test-only' }, 'nuxt', {
+        includeDomains: ['nuxt.com', 'github.com'],
+        maxResults: 11,
+      })
+      assert.equal(requestedUrl?.hostname, 'api.serply.io')
+      assert.equal(requestedUrl?.pathname, '/v1/search')
+      assert.equal(requestedUrl?.searchParams.get('q'), 'nuxt (site:nuxt.com OR site:github.com)')
+      assert.equal(requestedUrl?.searchParams.get('num'), '10')
+      assert.equal(requestedHeaders['X-Api-Key'], 'test-only')
+      assert.equal(results.length, 11)
+      assert.deepEqual(results[0], {
+        content: 'Snippet 0',
+        sourceType: 'search-result',
+        url: 'https://example.com/0',
+        title: 'Result 0',
+        publishedAt: '2 days ago',
+      })
+      assert.equal('publishedAt' in results[1]!, false)
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+
+  it('requires a key, drops items without link or description, and surfaces API errors', async () => {
+    await assert.rejects(() => searchWeb({ provider: 'serply' }, 'query'), /Serply API key not set/)
+
+    const previous = globalThis.fetch
+    globalThis.fetch = (async () =>
+      Response.json({
+        results: [
+          { title: 'No link', description: 'orphan' },
+          { link: 'https://example.com/empty', title: 'No text' },
+        ],
+      })) as typeof fetch
+    try {
+      assert.deepEqual(await searchWeb({ provider: 'serply', apiKey: 'k' }, 'query'), [])
+    } finally {
+      globalThis.fetch = previous
+    }
+
+    globalThis.fetch = (async () =>
+      Response.json({ detail: 'Invalid API key' }, { status: 401 })) as typeof fetch
+    try {
+      await assert.rejects(
+        () => searchWeb({ provider: 'serply', apiKey: 'k' }, 'query'),
+        /Serply Error: Invalid API key/,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+
+    globalThis.fetch = (async () => new Response('Bad gateway', { status: 502 })) as typeof fetch
+    try {
+      await assert.rejects(
+        () => searchWeb({ provider: 'serply', apiKey: 'k' }, 'query'),
+        /Serply Error: HTTP 502/,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+})

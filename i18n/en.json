@@ -68,6 +68,9 @@
         "youcom": {
           "help": "Web search via the You.com Search API. Works without an API key (limited daily quota); add a key at {0} for higher limits.",
           "apiKeyPlaceholder": "Optional — leave empty for the keyless free tier"
+        },
+        "serply": {
+          "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",

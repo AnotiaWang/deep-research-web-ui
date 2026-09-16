@@ -131,6 +131,7 @@ class ApiKeyPool {
 let apiKeyPool: ApiKeyPool | undefined
 let googleApiKeyPool: ApiKeyPool | undefined
 let youcomApiKeyPool: ApiKeyPool | undefined
+let serplyApiKeyPool: ApiKeyPool | undefined
 
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig()
@@ -343,6 +344,31 @@ export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFu
       const selectedKeyConfig = pool.getNextKey()
       if (!selectedKeyConfig) {
         throw new Error('No active You.com API keys available.')
+      }
+      const currentApiKey = selectedKeyConfig.key
+      try {
+        const results = await searchWeb({ ...sharedConfig, apiKey: currentApiKey }, query, options)
+        pool.markKeySuccess(currentApiKey)
+        return results
+      } catch (e) {
+        if (options.signal?.aborted || isAbortError(e)) throw e
+        pool.markKeyError(currentApiKey)
+        throw e
+      }
+    }
+
+    if (provider === 'serply') {
+      const pool = getOrCreateApiKeyPool(
+        serplyApiKeyPool,
+        (next) => {
+          serplyApiKeyPool = next
+        },
+        'serply',
+        runtimeConfig,
+      )
+      const selectedKeyConfig = pool.getNextKey()
+      if (!selectedKeyConfig) {
+        throw new Error('No active Serply API keys available.')
       }
       const currentApiKey = selectedKeyConfig.key
       try {
