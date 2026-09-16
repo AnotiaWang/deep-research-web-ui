@@ -139,6 +139,15 @@
       _help: t('settings.webSearch.providers.youcom.help'),
       link: 'https://you.com/platform/api-keys',
     },
+    ...(isServerMode.value
+      ? [
+          {
+            label: 'Parallel Search MCP',
+            value: 'parallel',
+            link: 'https://docs.parallel.ai/integrations/mcp/search-mcp',
+          },
+        ]
+      : []),
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
   const selectedAiProvider = computed(() =>

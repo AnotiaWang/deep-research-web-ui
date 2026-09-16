@@ -308,7 +308,7 @@ async function axiosProxyFetch(
       responseType: 'stream',
       // fetch resolves on HTTP error statuses; only network failures reject.
       validateStatus: () => true,
-      maxRedirects: 5,
+      maxRedirects: init?.redirect === 'error' || init?.redirect === 'manual' ? 0 : 5,
       proxy: {
         protocol: proxy.protocol.replace(/:$/, ''),
         host: proxy.host,
@@ -318,6 +318,10 @@ async function axiosProxyFetch(
           : {}),
       },
     })
+    if (init?.redirect === 'error' && [301, 302, 303, 307, 308].includes(response.status)) {
+      response.data.destroy()
+      throw new Error('Redirects are disabled for this request.')
+    }
     const headers = new Headers()
     const rawHeaders = AxiosHeaders.from(response.headers as unknown as AxiosHeaders).toJSON()
     for (const [key, value] of Object.entries(rawHeaders)) {

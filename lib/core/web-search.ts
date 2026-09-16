@@ -123,7 +123,7 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
   } else if (domains) limits.push('domains')
   if (options.intent === 'news') limits.push('news')
   if (provider === 'google-pse') return { google, firecrawl: {}, tavily: {}, limitations: limits }
-  if (provider === 'youcom')
+  if (provider === 'youcom' || provider === 'parallel')
     return {
       // This adapter does not apply native filters. A mixed web/news
       // response does not enforce the caller's news intent.
@@ -381,6 +381,8 @@ export async function searchWeb(
       return searchWithGooglePse(config, query, options)
     case 'youcom':
       return searchWithYoucom(config, query, options)
+    case 'parallel':
+      throw new Error('Parallel Search MCP requires Server Mode (NUXT_PUBLIC_SERVER_MODE=true).')
     case 'tavily':
     default:
       return searchWithTavily(config, query, options)
