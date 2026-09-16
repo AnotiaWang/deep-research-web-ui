@@ -13,6 +13,7 @@ import path from 'node:path'
 import { isAbortError } from '~~/shared/utils/abort'
 import { researchRequestSchema } from '~~/shared/utils/research-input'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
+import { createParallelWebSearch } from '~~/server/utils/parallel-search'
 
 // --- ApiKeyPool with File-based State Persistence ---
 
@@ -272,6 +273,9 @@ function getOrCreateApiKeyPool(
 
 export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFunction {
   const proxyFetch = getServerProxyFetch(proxyEnvFromRuntimeConfig(runtimeConfig))
+  if (runtimeConfig.public.webSearchProvider === 'parallel') {
+    return createParallelWebSearch({ fetch: proxyFetch })
+  }
   const search: WebSearchFunction = async (query: string, options: WebSearchOptions) => {
     const provider = runtimeConfig.public.webSearchProvider as ConfigWebSearchProvider
     const sharedConfig = {
