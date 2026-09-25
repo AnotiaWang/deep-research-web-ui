@@ -82,6 +82,10 @@
       value: 'openrouter',
     },
     {
+      label: 'API Route',
+      value: 'api-route',
+    },
+    {
       label: 'Requesty',
       value: 'requesty',
     },

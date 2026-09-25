@@ -4,6 +4,7 @@ export type ConfigAiProvider =
   | '302-ai'
   | 'infiniai'
   | 'openrouter'
+  | 'api-route'
   | 'requesty'
   | 'deepseek'
   | 'ollama'

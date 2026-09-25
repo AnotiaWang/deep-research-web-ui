@@ -17,7 +17,7 @@ Deep Research Web 能把一个研究问题变成一份带引用的报告：自�
 
 当前支持的供应商：
 
-- AI 服务：OpenAI compatible, SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM 等
+- AI 服务：OpenAI compatible, SiliconFlow, InfiniAI, DeepSeek, OpenRouter, API Route, Requesty, Ollama, LiteLLM 等
 - 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply
 
 喜欢本项目请点 ⭐ 收藏！
@@ -146,7 +146,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 
 | 类型 | 支持的值 |
 |------|----------|
-| AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
+| AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `api-route`, `requesty`, `deepseek`, `ollama`, `litellm` |
 | 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply` |
 
 说明：
@@ -159,6 +159,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 - Serply（`serply`）通过 [Serply API](https://serply.io/docs) 返回 Google 网页和新闻结果，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（支持逗号分隔多密钥轮询）。时间范围、新闻意图、语言和域名过滤会原生生效；明确的发布日期区间不会。
 - Ollama 默认 API Base 为 `http://localhost:11434/v1`。如果应用运行在 Docker 容器内，`localhost` 指向容器自身；若 Ollama 运行在宿主机或其他容器中，请将 `NUXT_AI_API_BASE` 设置为容器可访问的宿主机地址或 Docker 网络地址。
 - LiteLLM 默认 API Base 为 `http://localhost:4000/v1`。当代理未启用认证时，API 密钥可以留空；如果代理无法通过默认本地地址访问，请设置 `NUXT_AI_API_BASE`。
+- API Route 默认 API Base 为 `https://global.api-route.com/v1`，模型 ID 例如 `gpt-4o-mini`。如果复制 `.env.example`，需将其中指向 OpenAI 的 `NUXT_AI_API_BASE` 改为该地址。
 - Requesty 默认 API Base 为 `https://router.requesty.ai/v1`，模型 ID 使用 `provider/model` 格式，例如 `openai/gpt-4o`。
 
 #### 出站代理（仅服务端模式）
