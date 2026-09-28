@@ -19,7 +19,7 @@ Features:
 
 Currently available providers:
 
-- AI: OpenAI compatible, [ApiSmart](https://www.apismart.ai), SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM and more
+- AI: OpenAI compatible, [ApiSmart](https://www.apismart.ai), SiliconFlow, InfiniAI, DeepSeek, OpenRouter, API Route, Requesty, Ollama, LiteLLM and more
 - Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE, You.com, [Serply](https://serply.io)
 
 Please give a 🌟 Star if you like this project!
@@ -148,7 +148,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 
 | Type | Supported values |
 |------|------------------|
-| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
+| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `api-route`, `requesty`, `deepseek`, `ollama`, `litellm` |
 | Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply` |
 
 Notes:
@@ -161,6 +161,7 @@ Notes:
 - Serply (`serply`) returns Google web and news results through the [Serply API](https://serply.io/docs) and reads its key from `NUXT_WEB_SEARCH_API_KEY` (comma-separated keys supported for rotation). Time range, news intent, language and domain filters are applied natively; explicit publication-date windows are not.
 - Ollama uses `http://localhost:11434/v1` as the default API base. When running the app inside Docker, `localhost` refers to the container itself, so set `NUXT_AI_API_BASE` to a reachable host or Docker network address if Ollama runs outside the container.
 - LiteLLM uses `http://localhost:4000/v1` as the default API base. Its API key is optional when the proxy does not require authentication; set `NUXT_AI_API_BASE` when the proxy is not reachable at the default local address.
+- API Route uses `https://global.api-route.com/v1` as the default API base and model IDs such as `gpt-4o-mini`. If you copy `.env.example`, update its `NUXT_AI_API_BASE` value, which points to OpenAI by default.
 - Requesty uses `https://router.requesty.ai/v1` as the default API base and expects model IDs in `provider/model` format, such as `openai/gpt-4o`.
 
 #### Outbound proxy (Server Mode only)

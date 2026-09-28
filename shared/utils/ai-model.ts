@@ -55,6 +55,9 @@ export function getApiBase(config: ConfigAi) {
   if (config.provider === 'openrouter') {
     return config.apiBase || 'https://openrouter.ai/api/v1'
   }
+  if (config.provider === 'api-route') {
+    return config.apiBase || 'https://global.api-route.com/v1'
+  }
   if (config.provider === 'requesty') {
     return config.apiBase || 'https://router.requesty.ai/v1'
   }
