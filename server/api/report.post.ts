@@ -1,4 +1,4 @@
-import { writeFinalReport } from '~~/lib/core/deep-research'
+import { writeFinalReport } from '~~/lib/core/report'
 import type { ConfigAi } from '~~/shared/types/config'
 import { getStreamErrorMessage } from '~~/shared/utils/stream-error'
 import { z } from 'zod'

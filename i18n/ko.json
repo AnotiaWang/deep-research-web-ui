@@ -28,10 +28,6 @@
           "title": "SiliconFlow",
           "description": "가입 시 ¥14 무료 크레딧을 제공합니다. {0}에서 API 키를 발급받으세요."
         },
-        "infiniai": {
-          "title": "InfiniAI",
-          "description": "가입 후 별도 제한 없이 풀 파워 DeepSeek R1 등 추론 가속 모델을 사용할 수 있습니다. {0}에 로그인한 후 API 키를 생성하세요."
-        },
         "302-ai": {
           "title": "302.AI",
           "description": "가입 시 $1 무료 크레딧을 제공합니다. {0}에서 API 키를 발급받으세요."
@@ -68,6 +64,12 @@
         "youcom": {
           "help": "You.com 검색 API를 통한 웹 검색. API 키 없이 사용할 수 있습니다(일일 할당량 제한); 더 높은 한도를 원하면 {0}에서 키를 발급받으세요.",
           "apiKeyPlaceholder": "선택 사항 — 비워 두면 키 없는 무료 사용량이 적용됩니다"
+        },
+        "parallel": {
+          "help": "서버 모드에서 API 키 없이 무료로 검색하고 원문을 읽습니다. 공개 배포는 익명 요청 한도를 공유합니다."
+        },
+        "serply": {
+          "help": "Serply API를 통한 웹 검색(Google 결과). API 키가 필요하며 {0}에서 발급받을 수 있습니다."
         }
       },
       "concurrencyLimitHelp": "동시 검색 작업 수를 제한합니다. 검색 제공자에 과부하가 걸려 요청이 실패하는 것을 방지하는 데 유용합니다.",
@@ -85,6 +87,29 @@
     "depthHelp": "반복(iteration) 횟수입니다.",
     "breadth": "너비(Breadth)",
     "breadthHelp": "첫 번째 반복에서의 검색 횟수입니다. 각 반복의 검색 너비는 이전 반복의 절반입니다.",
+    "preset": "리서치 모드",
+    "presetHelp": "심층 모드일수록 검색 횟수와 소요 시간이 늘어나고 API 사용량도 많아집니다.",
+    "presets": {
+      "auto": {
+        "label": "자동",
+        "description": "AI가 주제에 맞는 모드를 추천합니다. 검색 전에 변경할 수 있습니다."
+      },
+      "quick": {
+        "label": "빠르게",
+        "description": "간단한 사실 확인에 적합합니다. 너비 {breadth} × 깊이 {depth}, 최대 약 {count}회 검색."
+      },
+      "standard": {
+        "label": "표준",
+        "description": "대부분의 주제에 적합합니다. 너비 {breadth} × 깊이 {depth}, 최대 약 {count}회 검색."
+      },
+      "deep": {
+        "label": "심층",
+        "description": "복잡하거나 넓은 주제에 적합합니다. 너비 {breadth} × 깊이 {depth}, 최대 약 {count}회 검색."
+      }
+    },
+    "advanced": "고급 설정",
+    "estimatedSearches": "현재 설정으로 최대 약 {count}회의 검색이 계획됩니다. 목표가 충분히 다뤄지면 더 일찍 끝날 수 있습니다.",
+    "autoModeHint": "자동 모드에서는 AI가 질문할 때 너비와 깊이를 추천합니다. 너비나 깊이를 직접 수정하면 수동 설정으로 전환됩니다.",
     "required": "필수 입력 항목입니다.",
     "integerRange": "{min}에서 {max} 사이의 정수를 입력하세요.",
     "start": "연구 시작",
@@ -97,7 +122,11 @@
     "submit": "답변 제출",
     "continue": "연구 계속하기",
     "error": "피드백을 가져오는 중 오류 발생: {0}",
-    "noQuestions": "모델이 후속 질문을 반환하지 않았습니다."
+    "noQuestions": "모델이 후속 질문을 반환하지 않았습니다.",
+    "researchMode": "리서치 모드",
+    "suggestedMode": "AI 추천 \"{mode}\": ",
+    "noSuggestedMode": "AI 추천이 없어 기본 모드를 선택했습니다.",
+    "modeEstimate": "최대 약 {count}회 검색."
   },
   "webBrowsing": {
     "readingSource": "출처 본문 읽는 중…",
@@ -159,6 +188,15 @@
     "webSearchProvider": "웹 검색 제공자",
     "searchLanguage": "검색 언어",
     "configNotice": "현재 설정은 서버 관리자가 지정한 것입니다. 변경이 필요하면 관리자에게 문의하세요."
+  },
+  "accessPassword": {
+    "title": "접근 비밀번호",
+    "description": "이 서버에서 리서치를 실행하려면 비밀번호가 필요합니다.",
+    "label": "비밀번호",
+    "submit": "잠금 해제",
+    "invalid": "비밀번호가 올바르지 않습니다.",
+    "success": "인증되었습니다",
+    "denied": "서버가 요청을 거부했습니다: 접근 비밀번호가 없거나 올바르지 않습니다."
   },
   "history": {
     "title": "기록",

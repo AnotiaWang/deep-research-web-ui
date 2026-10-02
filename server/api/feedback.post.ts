@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
       data: parsedBody.error.flatten(),
     })
   }
-  const { query, language, numQuestions } = parsedBody.data
+  const { query, language, numQuestions, suggestResearchMode } = parsedBody.data
 
   // Create server-side configuration
   const serverConfig: ConfigAi = {
@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
           query,
           language,
           numQuestions,
+          suggestResearchMode,
           aiConfig: serverConfig,
           signal: requestAbort.signal,
         })

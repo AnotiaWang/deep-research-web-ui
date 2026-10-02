@@ -16,6 +16,7 @@ import type { ConfigWebSearchProvider } from '~~/shared/types/config'
 import type { WebSearchResult } from '~~/shared/types/types'
 
 export type WebSearchOptions = SearchConstraints & {
+  researchGoal?: string
   maxResults?: number
   /** Search language. Unsupported provider filters are reported through onNotice. */
   lang?: string
@@ -29,6 +30,7 @@ export type WebSearchFunction = ((
 ) => Promise<WebSearchResult[]>) & {
   provider?: ConfigWebSearchProvider
   readSource?: ReadSourceFunction
+  close?: () => Promise<void>
 }
 
 export type WebSearchConfig = {
@@ -40,7 +42,7 @@ export type WebSearchConfig = {
   tavilySearchTopic?: 'general' | 'news' | 'finance'
   /**
    * Custom fetch implementation (server-only). Used to route Google PSE /
-   * you.com requests through an outbound proxy. Tavily/Firecrawl SDKs
+   * you.com / Serply requests through an outbound proxy. Tavily/Firecrawl SDKs
    * (axios-based) pick up `HTTP(S)_PROXY` env instead. Never set in the browser.
    */
   fetch?: typeof fetch
@@ -50,6 +52,7 @@ const FIRECRAWL_DEFAULT_API_BASE = 'https://api.firecrawl.dev'
 const CRW_DEFAULT_API_BASE = 'https://fastcrw.com/api'
 const YOUCOM_KEYLESS_SEARCH_URL = 'https://api.you.com/v1/agents/search'
 const YOUCOM_KEYED_SEARCH_URL = 'https://ydc-index.io/v1/search'
+const SERPLY_SEARCH_URL = 'https://api.serply.io/v1/search'
 
 /** Single item from the You.com search API `results.web` / `results.news` arrays. */
 interface YoucomSearchResult {
@@ -61,6 +64,17 @@ interface YoucomSearchResult {
   snippets?: string[]
   /** Publication date, e.g. `2025-07-14T00:00:00`. */
   page_age?: string
+}
+
+/** Single item from the Serply search API `results` array. */
+interface SerplySearchResult {
+  link?: string
+  title?: string
+  description?: string
+  metadata?: {
+    /** Present on news results, e.g. `2 days ago`. */
+    published_time?: string
+  }
 }
 
 export function resolveWebSearchApiBase(
@@ -123,6 +137,22 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
   } else if (domains) limits.push('domains')
   if (options.intent === 'news') limits.push('news')
   if (provider === 'google-pse') return { google, firecrawl: {}, tavily: {}, limitations: limits }
+  if (provider === 'serply') {
+    // Serply proxies Google web search, so the Google URL parameters apply.
+    // Domains are handled by the adapter with a `site:` clause in the query.
+    const serply: Record<string, string> = {}
+    if (tbs && !hasDates) serply.tbs = tbs
+    if (google.lr) serply.lr = google.lr
+    if (options.intent === 'news') serply.tbm = 'nws'
+    return {
+      google: {},
+      firecrawl: {},
+      tavily: {},
+      serply,
+      // Explicit publication-date windows (cdr) are not applied reliably.
+      limitations: hasDates ? ['time' as const] : [],
+    }
+  }
   if (provider === 'youcom' || provider === 'parallel')
     return {
       // This adapter does not apply native filters. A mixed web/news
@@ -364,6 +394,74 @@ async function searchWithYoucom(
   }
 }
 
+async function searchWithSerply(
+  config: WebSearchConfig,
+  query: string,
+  options: WebSearchOptions,
+): Promise<WebSearchResult[]> {
+  const apiKey = config.apiKey
+  if (!apiKey) {
+    throw new Error('Serply API key not set')
+  }
+
+  // Ref: https://serply.io/docs
+  const maxResults = options.maxResults ?? 5
+  const domains = options.includeDomains ?? []
+  const siteClause = domains.map((d) => `site:${d}`).join(' OR ')
+  const q = siteClause ? `${query} ${domains.length > 1 ? `(${siteClause})` : siteClause}` : query
+  const searchParams = new URLSearchParams({
+    q,
+    // The API returns at most 10 results per request; the tail is trimmed below.
+    num: Math.min(maxResults, 10).toString(),
+  })
+  for (const [key, value] of Object.entries(buildSearchFilters('serply', options).serply ?? {})) {
+    searchParams.set(key, value)
+  }
+  const apiUrl = `${SERPLY_SEARCH_URL}?${searchParams.toString()}`
+
+  try {
+    const doFetch = config.fetch ?? fetch
+    const response = await doFetch(apiUrl, {
+      headers: {
+        'X-Api-Key': apiKey,
+        Accept: 'application/json',
+        // Browsers drop this header; the server route sends it as-is.
+        'User-Agent': 'deep-research-web-ui',
+      },
+      signal: options.signal,
+    })
+    // Error bodies from the edge may not be JSON.
+    const data = (await response.json().catch(() => ({}))) as {
+      results?: SerplySearchResult[]
+      detail?: string
+    }
+
+    if (!response.ok) {
+      throw new Error(data.detail || `HTTP ${response.status}`)
+    }
+
+    return (data.results ?? [])
+      .flatMap((r): WebSearchResult[] => {
+        if (!r.link || !r.description) return []
+        return [
+          {
+            content: r.description,
+            sourceType: 'search-result' as const,
+            url: r.link,
+            ...(r.title ? { title: r.title } : {}),
+            ...(r.metadata?.published_time ? { publishedAt: r.metadata.published_time } : {}),
+          },
+        ]
+      })
+      .slice(0, maxResults)
+  } catch (error: unknown) {
+    if (options.signal?.aborted || isAbortError(error)) throw error
+    console.error('Serply search failed:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`Serply Error: ${message}`)
+  }
+}
+
 /** Run a single web search with the given provider config. */
 export async function searchWeb(
   config: WebSearchConfig,
@@ -383,6 +481,8 @@ export async function searchWeb(
       return searchWithYoucom(config, query, options)
     case 'parallel':
       throw new Error('Parallel Search MCP requires Server Mode (NUXT_PUBLIC_SERVER_MODE=true).')
+    case 'serply':
+      return searchWithSerply(config, query, options)
     case 'tavily':
     default:
       return searchWithTavily(config, query, options)

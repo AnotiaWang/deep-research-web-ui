@@ -5,6 +5,13 @@
     ResearchFeedbackResult,
     ResearchInputSnapshot,
   } from '~~/shared/types/research-session'
+  import {
+    findResearchPreset,
+    isResearchPreset,
+    researchPresets,
+    type ResearchDepthSettings,
+    type ResearchPreset,
+  } from '~~/shared/utils/research-input'
 
   export interface GetFeedbackOptions {
     input: ResearchInputSnapshot
@@ -15,10 +22,12 @@
   const props = defineProps<{
     isLoadingSearch?: boolean
     disabled?: boolean
+    /** Ask the model to recommend a research preset along with its questions */
+    autoMode?: boolean
   }>()
 
-  defineEmits<{
-    (e: 'submit'): void
+  const emit = defineEmits<{
+    (e: 'submit', settings?: ResearchDepthSettings): void
   }>()
 
   const feedback = defineModel<ResearchFeedbackResult[]>({ required: true })
@@ -35,6 +44,25 @@
   const error = ref('')
   /** True after a feedback request finished successfully (including zero questions). */
   const feedbackReady = ref(false)
+
+  const presetItems = useResearchPresetItems()
+  /** Set when the request asked for a recommendation; the user confirms it before research. */
+  const modeSelectable = ref(false)
+  const suggestedMode = ref<ResearchPreset>()
+  const suggestedModeReason = ref('')
+  const selectedMode = ref<ResearchPreset>()
+  const selectedModeItem = computed(() =>
+    presetItems.value.find((item) => item.value === selectedMode.value),
+  )
+
+  function submit() {
+    emit(
+      'submit',
+      modeSelectable.value && selectedMode.value
+        ? { ...researchPresets[selectedMode.value] }
+        : undefined,
+    )
+  }
 
   const isSubmitButtonDisabled = computed(() => {
     if (isLoading.value || props.isLoadingSearch || props.disabled || !feedbackReady.value) {
@@ -65,10 +93,14 @@
       throw new Error(t('index.missingConfigDescription'))
     }
     isLoading.value = true
+    const suggestResearchMode = !!props.autoMode
+    let researchMode: unknown
+    let researchModeReason: unknown
     try {
       const chunks = await feedbackFunction({
         query: input.query,
         numQuestions: input.numQuestions,
+        suggestResearchMode,
         language: t('language', {}, { locale: locale.value }),
         aiConfig: config.value.ai,
         signal,
@@ -85,6 +117,8 @@
             Array.isArray(feedback.value) ? feedback.value : [],
             chunk.value?.questions,
           )
+          researchMode = chunk.value?.researchMode
+          researchModeReason = chunk.value?.researchModeReason
         } else if (chunk.type === 'bad-end') {
           error.value = t('invalidStructuredOutput')
         }
@@ -99,6 +133,16 @@
       // only when the model explicitly returned {"questions":[]} (no bad-end).
       if (!hasMeaningfulFeedbackQuestions(feedback.value)) {
         feedback.value = []
+      }
+      if (suggestResearchMode) {
+        // Partial JSON may stop mid-value, so only an exact preset key counts as a suggestion.
+        suggestedMode.value = isResearchPreset(researchMode) ? researchMode : undefined
+        suggestedModeReason.value =
+          suggestedMode.value && typeof researchModeReason === 'string'
+            ? researchModeReason.trim()
+            : ''
+        selectedMode.value = suggestedMode.value ?? findResearchPreset(input) ?? 'standard'
+        modeSelectable.value = true
       }
       feedbackReady.value = true
       return (Array.isArray(feedback.value) ? feedback.value : []).map((item) => ({ ...item }))
@@ -124,6 +168,10 @@
     reasoningContent.value = ''
     isLoading.value = false
     feedbackReady.value = false
+    modeSelectable.value = false
+    suggestedMode.value = undefined
+    suggestedModeReason.value = ''
+    selectedMode.value = undefined
   }
 
   defineExpose({
@@ -170,13 +218,39 @@
           </label>
           <UInput :id="`feedback-answer-${index}`" v-model="item.userAnswer" :disabled="disabled" />
         </div>
+
+        <UFormField
+          v-if="feedbackReady && modeSelectable"
+          :label="$t('modelFeedback.researchMode')"
+        >
+          <URadioGroup
+            v-model="selectedMode"
+            :items="presetItems"
+            orientation="horizontal"
+            :disabled="disabled"
+            :ui="{ description: 'hidden' }"
+          />
+          <template #help>
+            <p v-if="suggestedMode">
+              {{
+                $t('modelFeedback.suggestedMode', {
+                  mode: $t(`researchTopic.presets.${suggestedMode}.label`),
+                })
+              }}{{ suggestedModeReason }}
+            </p>
+            <p v-else>{{ $t('modelFeedback.noSuggestedMode') }}</p>
+            <p v-if="selectedModeItem">
+              {{ $t('modelFeedback.modeEstimate', { count: selectedModeItem.count }) }}
+            </p>
+          </template>
+        </UFormField>
       </template>
       <UButton
         color="primary"
         :loading="isLoadingSearch || isLoading"
         :disabled="isSubmitButtonDisabled"
         block
-        @click="$emit('submit')"
+        @click="submit"
       >
         {{
           feedbackReady && !feedback.length

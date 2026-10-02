@@ -1,6 +1,12 @@
 <script setup lang="ts">
   import type { ResearchInputData } from '~~/shared/types/research-session'
-  import { researchInputLimits, researchInputSchema } from '~~/shared/utils/research-input'
+  import {
+    estimateMaxSearches,
+    findResearchPreset,
+    researchInputLimits,
+    researchInputSchema,
+    researchPresets,
+  } from '~~/shared/utils/research-input'
 
   defineProps<{
     isLoadingFeedback: boolean
@@ -14,6 +20,8 @@
 
   const { t } = useI18n()
   const form = defineModel<ResearchInputData>({ required: true })
+  /** Let the model recommend breadth/depth during feedback; form values are the fallback. */
+  const autoMode = defineModel<boolean>('autoMode', { default: false })
 
   const validationResult = computed(() => researchInputSchema.safeParse(form.value))
   const isSubmitButtonDisabled = computed(() => !validationResult.value.success)
@@ -38,6 +46,40 @@
   )
   const depthError = computed(() => integerRangeError(form.value.depth, 'depth'))
   const breadthError = computed(() => integerRangeError(form.value.breadth, 'breadth'))
+
+  const researchPresetItems = useResearchPresetItems()
+  const presetItems = computed(() => [
+    {
+      value: 'auto' as const,
+      label: t('researchTopic.presets.auto.label'),
+      description: t('researchTopic.presets.auto.description'),
+    },
+    ...researchPresetItems.value,
+  ])
+  /** Derived from breadth/depth, so history items and manual edits stay in sync. */
+  const preset = computed({
+    get: () => (autoMode.value ? 'auto' : findResearchPreset(form.value)),
+    set: (value) => {
+      if (!value) return
+      autoMode.value = value === 'auto'
+      if (value !== 'auto') form.value = { ...form.value, ...researchPresets[value] }
+    },
+  })
+  const estimatedSearches = computed(() =>
+    autoMode.value || depthError.value || breadthError.value
+      ? undefined
+      : estimateMaxSearches(Number(form.value.breadth), Number(form.value.depth)),
+  )
+
+  const showAdvanced = ref(false)
+  // Custom values or invalid fields must never be hidden behind the collapsed section.
+  watch(
+    () => !preset.value || !!(numQuestionsError.value || depthError.value || breadthError.value),
+    (needsAdvanced) => {
+      if (needsAdvanced) showAdvanced.value = true
+    },
+    { immediate: true },
+  )
 
   function handleSubmit() {
     const result = researchInputSchema.safeParse(form.value)
@@ -66,57 +108,91 @@
           />
         </UFormField>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <UFormField
-            :label="$t('researchTopic.numOfQuestions')"
-            :error="numQuestionsError"
-            required
+        <UFormField :label="$t('researchTopic.preset')">
+          <template #help>{{ $t('researchTopic.presetHelp') }}</template>
+          <URadioGroup
+            v-model="preset"
+            :items="presetItems"
+            variant="card"
+            orientation="horizontal"
+            :disabled="disabled"
+            :ui="{ fieldset: 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2', item: 'p-3' }"
+          />
+        </UFormField>
+
+        <div>
+          <UButton
+            variant="link"
+            color="neutral"
+            class="px-0"
+            :icon="showAdvanced ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+            @click="showAdvanced = !showAdvanced"
           >
-            <template #help>
-              {{ $t('researchTopic.numOfQuestionsHelp') }}
-            </template>
-            <UInput
-              v-model="form.numQuestions"
-              class="w-full"
-              name="numQuestions"
-              type="number"
-              :min="researchInputLimits.numQuestions.min"
-              :max="researchInputLimits.numQuestions.max"
-              :step="1"
-              :disabled="disabled"
-              required
-            />
-          </UFormField>
+            {{ $t('researchTopic.advanced') }}
+          </UButton>
+        </div>
 
-          <UFormField :label="$t('researchTopic.depth')" :error="depthError" required>
-            <template #help>{{ $t('researchTopic.depthHelp') }}</template>
-            <UInput
-              v-model="form.depth"
-              class="w-full"
-              name="depth"
-              type="number"
-              :min="researchInputLimits.depth.min"
-              :max="researchInputLimits.depth.max"
-              :step="1"
-              :disabled="disabled"
+        <div v-if="showAdvanced" class="flex flex-col gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <UFormField
+              :label="$t('researchTopic.numOfQuestions')"
+              :error="numQuestionsError"
               required
-            />
-          </UFormField>
+            >
+              <template #help>
+                {{ $t('researchTopic.numOfQuestionsHelp') }}
+              </template>
+              <UInput
+                v-model="form.numQuestions"
+                class="w-full"
+                name="numQuestions"
+                type="number"
+                :min="researchInputLimits.numQuestions.min"
+                :max="researchInputLimits.numQuestions.max"
+                :step="1"
+                :disabled="disabled"
+                required
+              />
+            </UFormField>
 
-          <UFormField :label="$t('researchTopic.breadth')" :error="breadthError" required>
-            <template #help>{{ $t('researchTopic.breadthHelp') }}</template>
-            <UInput
-              v-model="form.breadth"
-              class="w-full"
-              name="breadth"
-              type="number"
-              :min="researchInputLimits.breadth.min"
-              :max="researchInputLimits.breadth.max"
-              :step="1"
-              :disabled="disabled"
-              required
-            />
-          </UFormField>
+            <UFormField :label="$t('researchTopic.depth')" :error="depthError" required>
+              <template #help>{{ $t('researchTopic.depthHelp') }}</template>
+              <UInput
+                v-model="form.depth"
+                @update:model-value="autoMode = false"
+                class="w-full"
+                name="depth"
+                type="number"
+                :min="researchInputLimits.depth.min"
+                :max="researchInputLimits.depth.max"
+                :step="1"
+                :disabled="disabled"
+                required
+              />
+            </UFormField>
+
+            <UFormField :label="$t('researchTopic.breadth')" :error="breadthError" required>
+              <template #help>{{ $t('researchTopic.breadthHelp') }}</template>
+              <UInput
+                v-model="form.breadth"
+                @update:model-value="autoMode = false"
+                class="w-full"
+                name="breadth"
+                type="number"
+                :min="researchInputLimits.breadth.min"
+                :max="researchInputLimits.breadth.max"
+                :step="1"
+                :disabled="disabled"
+                required
+              />
+            </UFormField>
+          </div>
+          <p v-if="autoMode" class="text-sm text-gray-500">
+            {{ $t('researchTopic.autoModeHint') }}
+          </p>
+          <p v-else-if="estimatedSearches" class="text-sm text-gray-500">
+            {{ $t('researchTopic.estimatedSearches', { count: estimatedSearches }) }}
+          </p>
         </div>
       </div>
 

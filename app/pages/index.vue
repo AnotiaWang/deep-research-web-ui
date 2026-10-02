@@ -34,6 +34,7 @@
 
         <ResearchForm
           v-model="form"
+          v-model:auto-mode="autoMode"
           :is-loading-feedback="isFeedbackRunning"
           :disabled="!canBeginFeedback"
           :submit-disabled="!canBeginFeedback"
@@ -44,6 +45,7 @@
           v-model="feedback"
           :is-loading-search="isResearchRunning"
           :disabled="session.status !== 'awaiting-input'"
+          :auto-mode="autoMode"
           @submit="startDeepSearch"
         />
         <DeepResearch ref="deepResearch" :disabled="!canRetryResearch" @retry="retryResearchNode" />
@@ -64,6 +66,7 @@
       </div>
     </UContainer>
     <AutoUpdateToast />
+    <AccessPasswordModal v-if="isServerMode" />
   </div>
 </template>
 
@@ -81,6 +84,7 @@
     ResearchPhase,
   } from '~~/shared/types/research-session'
   import { isTimeoutError } from '~~/shared/utils/abort'
+  import type { ResearchDepthSettings } from '~~/shared/utils/research-input'
 
   const runtimeConfig = useRuntimeConfig()
   const { t } = useI18n()
@@ -97,6 +101,7 @@
     depth: 2,
     numQuestions: 3,
   })
+  const autoMode = ref(true)
   const feedback = ref<ResearchFeedbackResult[]>([])
 
   const researchSession = useResearchSession()
@@ -197,8 +202,8 @@
     }
   }
 
-  async function startDeepSearch() {
-    const lease = beginResearch(feedback.value)
+  async function startDeepSearch(settings?: ResearchDepthSettings) {
+    const lease = beginResearch(feedback.value, settings)
     if (!lease) return
     const signal = operationRuntime.start(lease, 'research')
 
@@ -335,6 +340,8 @@
       depth: item.depth,
       numQuestions: item.numQuestions,
     }
+    // Show the settings the item actually ran with instead of a fresh recommendation.
+    autoMode.value = false
     feedback.value = item.feedback.map((entry) => ({ ...entry }))
     deepResearchRef.value?.importGraph(item.graph)
     reportRef.value?.displayReport(item.report || '')

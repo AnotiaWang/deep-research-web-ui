@@ -7,7 +7,7 @@ import {
   createInitialResearchSession,
   researchSessionReducer,
   canRegenerateReportFromSession,
-} from '../app/composables/useResearchSession.ts'
+} from '../app/utils/research-session-reducer.ts'
 
 const finding = {
   url: 'https://example.com/pricing',

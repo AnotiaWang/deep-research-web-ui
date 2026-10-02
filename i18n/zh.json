@@ -28,10 +28,6 @@
           "title": "SiliconFlow 硅基流动",
           "description": "注册赠送 ¥14 免费额度。在 {0} 生成一个 API key。"
         },
-        "infiniai": {
-          "title": "InfiniAI 无问芯穹",
-          "description": "注册后，无门槛免费用 DeepSeek R1 满血等推理加速版模型。登录 {0} 后生成 API key。"
-        },
         "302-ai": {
           "title": "302.AI",
           "description": "注册赠送 $1 免费额度。在 {0} 生成一个 API key。"
@@ -68,6 +64,12 @@
         "youcom": {
           "help": "通过 You.com 搜索 API 进行网页搜索。无需 API 密钥即可使用（每日配额有限）；在 {0} 获取密钥可获得更高限额。",
           "apiKeyPlaceholder": "可选 — 留空则使用免密钥免费额度"
+        },
+        "parallel": {
+          "help": "服务端模式下免费、免密钥搜索和来源读取。公开部署会共享匿名访问的速率限制。"
+        },
+        "serply": {
+          "help": "通过 Serply API 进行网页搜索（Google 结果）。需要 API 密钥，可在 {0} 获取。"
         }
       },
       "concurrencyLimit": "并发数",
@@ -85,6 +87,29 @@
     "depthHelp": "联网搜索的迭代轮数。",
     "breadth": "研究广度 (Breadth)",
     "breadthHelp": "第一次迭代中的搜索次数。后续每轮迭代的搜索次数为上一轮的一半。",
+    "preset": "研究模式",
+    "presetHelp": "越深入的模式搜索次数越多、耗时越长，也会消耗更多 API 额度。",
+    "presets": {
+      "auto": {
+        "label": "自动",
+        "description": "由 AI 根据主题推荐档位，开始搜索前可以修改。"
+      },
+      "quick": {
+        "label": "快速",
+        "description": "适合简单的事实查询。广度 {breadth} × 深度 {depth}，最多约 {count} 次搜索。"
+      },
+      "standard": {
+        "label": "标准",
+        "description": "适合大多数主题。广度 {breadth} × 深度 {depth}，最多约 {count} 次搜索。"
+      },
+      "deep": {
+        "label": "深入",
+        "description": "适合复杂或宽泛的主题。广度 {breadth} × 深度 {depth}，最多约 {count} 次搜索。"
+      }
+    },
+    "advanced": "高级设置",
+    "estimatedSearches": "按当前设置，最多规划约 {count} 次搜索。研究目标已充分覆盖时可能提前结束。",
+    "autoModeHint": "自动模式下，AI 会在提问时推荐研究广度和深度。手动修改广度或深度会切换为自定义设置。",
     "required": "此项为必填项。",
     "integerRange": "请输入 {min} 到 {max} 之间的整数。",
     "start": "开始研究",
@@ -97,7 +122,11 @@
     "submit": "提交回答",
     "continue": "继续研究",
     "noQuestions": "问题已经足够清晰，无需补充追问，可以直接继续。",
-    "error": "获取反馈失败：{0}"
+    "error": "获取反馈失败：{0}",
+    "researchMode": "研究模式",
+    "suggestedMode": "AI 建议「{mode}」：",
+    "noSuggestedMode": "AI 未给出建议，已选择默认档位。",
+    "modeEstimate": "最多约 {count} 次搜索。"
   },
   "webBrowsing": {
     "readingSource": "正在读取来源正文…",
@@ -159,6 +188,15 @@
     "webSearchProvider": "搜索服务提供商",
     "searchLanguage": "搜索语言",
     "configNotice": "当前配置由服务器管理员设置，如需修改请联系管理员。"
+  },
+  "accessPassword": {
+    "title": "访问密码",
+    "description": "该服务器需要输入访问密码后才能使用研究功能。",
+    "label": "密码",
+    "submit": "解锁",
+    "invalid": "密码错误。",
+    "success": "验证成功",
+    "denied": "服务器拒绝了请求：未提供访问密码或密码错误。"
   },
   "history": {
     "title": "历史记录",

@@ -13,9 +13,9 @@ const { createServerWebSearch } = await import('../server/api/research.post.ts')
 if (previousHandler === undefined) delete globals.defineEventHandler
 else globals.defineEventHandler = previousHandler
 
-function config(apiKey?: string) {
+function config(apiKey?: string, provider = 'youcom') {
   return {
-    public: { webSearchProvider: 'youcom' },
+    public: { webSearchProvider: provider },
     webSearchApiKey: apiKey,
   } as RuntimeConfig
 }
@@ -69,6 +69,39 @@ it('rotates configured You.com keys and does not silently switch to keyless when
     }
     const requestCount = keys.length
     await assert.rejects(() => search('Nuxt', {}), /No active You.com API keys available/)
+    assert.equal(keys.length, requestCount)
+  } finally {
+    globalThis.fetch = previous
+    process.chdir(previousCwd)
+    rmSync(cacheRoot, { recursive: true, force: true })
+  }
+})
+
+it('rotates configured Serply keys and stops once every key is disabled', async () => {
+  const previous = globalThis.fetch
+  const previousCwd = process.cwd()
+  const cacheRoot = mkdtempSync(path.join(tmpdir(), 'serply-keypool-test-'))
+  const keys: (string | null)[] = []
+  let fail = false
+  globalThis.fetch = async (input, init) => {
+    assert.equal(new URL(String(input)).hostname, 'api.serply.io')
+    keys.push(new Headers(init?.headers).get('X-Api-Key'))
+    return fail
+      ? Response.json({ detail: 'Invalid API key' }, { status: 401 })
+      : Response.json({ results: [] })
+  }
+  process.chdir(cacheRoot)
+  try {
+    const search = createServerWebSearch(config('test-key-one, test-key-two', 'serply'))
+    await search('Nuxt', {})
+    await search('Nuxt', {})
+    assert.deepEqual(keys, ['test-key-one', 'test-key-two'])
+    fail = true
+    for (let index = 0; index < 10; index++) {
+      await assert.rejects(() => search('Nuxt', {}), /Invalid API key/)
+    }
+    const requestCount = keys.length
+    await assert.rejects(() => search('Nuxt', {}), /No active Serply API keys available/)
     assert.equal(keys.length, requestCount)
   } finally {
     globalThis.fetch = previous

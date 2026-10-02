@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  estimateMaxSearches,
   feedbackRequestSchema,
+  findResearchPreset,
+  researchPresets,
   researchInputSchema,
   researchRequestSchema,
 } from '../shared/utils/research-input.ts'
@@ -129,6 +132,27 @@ describe('research input validation', () => {
     assert.equal(parsed.success, true)
     if (parsed.success) {
       assert.equal(parsed.data.originalQuery, 'Initial Query: full topic')
+    }
+  })
+})
+
+describe('research presets', () => {
+  it('estimates the planned search upper bound with halving breadth', () => {
+    assert.equal(estimateMaxSearches(2, 1), 2)
+    assert.equal(estimateMaxSearches(2, 2), 4)
+    assert.equal(estimateMaxSearches(4, 3), 20)
+    assert.equal(estimateMaxSearches(8, 8), 424)
+  })
+
+  it('matches presets by breadth and depth, including string input', () => {
+    assert.equal(findResearchPreset(researchPresets.deep), 'deep')
+    assert.equal(findResearchPreset({ breadth: '2', depth: '2' }), 'standard')
+    assert.equal(findResearchPreset({ breadth: 3, depth: 2 }), undefined)
+  })
+
+  it('only defines presets within input limits', () => {
+    for (const preset of Object.values(researchPresets)) {
+      assert.equal(researchInputSchema.safeParse({ ...validInput, ...preset }).success, true)
     }
   })
 })

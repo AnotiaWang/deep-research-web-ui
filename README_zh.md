@@ -17,10 +17,36 @@ Deep Research Web 能把一个研究问题变成一份带引用的报告：自�
 
 当前支持的供应商：
 
-- AI 服务：OpenAI compatible, SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM 等
-- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）
+- AI 服务：OpenAI compatible, SiliconFlow, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM 等
+- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply, Parallel（免密钥，仅服务端模式）
 
 喜欢本项目请点 ⭐ 收藏！
+
+**赞助商**
+
+<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">MangoProxy</a> 提供覆盖 200+ 地区的住宅、ISP、移动与数据中心代理，适用于网页抓取、自动化、SEO 及多账号管理。优惠码：`GITHUBISP` —— 静态 ISP 代理 8% 折扣。
+
+<a href="https://mangoproxy.com/?utm_source=anotiawang&utm_medium=partner&utm_campaign=anotiawang_github" target="_blank">
+<img width="300" alt="MangoProxy" src="https://github.com/user-attachments/assets/bef14f25-e95b-472a-985c-56ae7b116a10" />
+</a>
+
+---
+
+<a href="https://www.apismart.ai/" target="_blank">ApiSmart.ai</a> 通过统一 API 提供主流 AI 模型的访问。一个 API 密钥即可通过 OpenAI 兼容接口调用 LLM、图像与视频模型，无需分别管理多家供应商。支持便捷切换模型、简化计费，并通过智能路由与自动故障转移提升可靠性。
+
+<a href="https://www.apismart.ai/" target="_blank">
+<img width="100" alt="ApiSmart" src="https://github.com/user-attachments/assets/bc5255ed-7354-41cd-81ec-fd515fe833ff" />
+</a>
+
+---
+
+<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">Helodata</a> 提供全球代理基础设施，覆盖 195+ 国家和地区，拥有 8000 万+ 合规授权住宅 IP，并支持住宅、ISP、不限量住宅、移动及数据中心代理等，为 AI、爬虫与自动化应用提供稳定可靠的数据访问。注册使用优惠码 **`DRWEB`**，可享专属九折！
+
+<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">
+<img width="852" alt="Helodata" src="https://github.com/user-attachments/assets/886d4c52-b558-443c-8b78-c2d46b12f9fb" />
+</a>
+
+---
 
 <video width="500" src="https://github.com/user-attachments/assets/8f9baa43-a74e-4613-aebb-1bcc29a686f0" controls></video>
 
@@ -96,6 +122,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
 | `NUXT_PUBLIC_SERVER_MODE` | 启用服务端模式 | `false` |
+| `NUXT_ACCESS_PASSWORD` | 可选，调用 `/api` 接口所需的访问密码 | - |
 | `NUXT_AI_API_KEY` | AI 服务商 API 密钥 | - |
 | `NUXT_AI_API_BASE` | AI 服务商基础 URL | - |
 | `NUXT_WEB_SEARCH_API_KEY` | 联网搜索 API 密钥 | - |
@@ -120,16 +147,18 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 
 | 类型 | 支持的值 |
 |------|----------|
-| AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `parallel`（仅服务端模式） |
+| AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
+| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel`（仅服务端模式） |
 
 说明：
 
-- `NUXT_WEB_SEARCH_API_KEY` 支持为 Tavily 和 Google PSE 配置逗号分隔的多个密钥，例如 `key1,key2,key3`。
+- 设置 `NUXT_ACCESS_PASSWORD` 后，访问者需要先输入密码才能进行研究。公网可访问的服务端模式部署强烈建议设置，否则任何人都能使用服务器配置的 API 密钥。
+- `NUXT_WEB_SEARCH_API_KEY` 支持为 Tavily、Google PSE 和 Serply 配置逗号分隔的多个密钥，例如 `key1,key2,key3`。
 - Google PSE 需要同时配置 `NUXT_WEB_SEARCH_API_KEY` 和 `NUXT_PUBLIC_GOOGLE_PSE_ID`。
 - Firecrawl 自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - fastCRW（`crw`）是与 Firecrawl 兼容的网页抓取工具（单一二进制文件；可自托管或使用云服务）。默认使用云端地址 `https://fastcrw.com/api`，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（文档中记为 `CRW_API_KEY`）；自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - You.com（`youcom`）从 `NUXT_WEB_SEARCH_API_KEY` 读取密钥（可选，支持逗号分隔多密钥轮询）。未设置密钥时使用免密钥端点（每日配额有限）；可在 https://you.com/platform/api-keys 获取密钥。
+- Serply（`serply`）通过 [Serply API](https://serply.io/docs) 返回 Google 网页和新闻结果，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（支持逗号分隔多密钥轮询）。时间范围、新闻意图、语言和域名过滤会原生生效；明确的发布日期区间不会。
 - Ollama 默认 API Base 为 `http://localhost:11434/v1`。如果应用运行在 Docker 容器内，`localhost` 指向容器自身；若 Ollama 运行在宿主机或其他容器中，请将 `NUXT_AI_API_BASE` 设置为容器可访问的宿主机地址或 Docker 网络地址。
 - LiteLLM 默认 API Base 为 `http://localhost:4000/v1`。当代理未启用认证时，API 密钥可以留空；如果代理无法通过默认本地地址访问，请设置 `NUXT_AI_API_BASE`。
 - Requesty 默认 API Base 为 `https://router.requesty.ai/v1`，模型 ID 使用 `provider/model` 格式，例如 `openai/gpt-4o`。
@@ -147,6 +176,8 @@ AI 服务商仍需按原有方式配置。Parallel 搜索无需 Parallel 账户�
 
 此服务商通过 `https://search.parallel.ai/mcp` 使用免费、受速率限制的 [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp)。搜索会向 Parallel 发送查询与搜索目标；按需读取页面会发送来源 URL。同一次研究的调用共用一个随机会话 ID。请求使用 `deep-research-web-ui/<应用版本>` 作为 User-Agent，便于 Parallel 统计项目的总体使用量。请参阅 Parallel 的[客户条款](https://parallel.ai/customer-terms)与[隐私政策](https://parallel.ai/privacy-policy)。
 
+公开的服务端部署共用一个出口 IP，因此所有用户共享匿名免费服务的速率限制。遇到限流时请降低并发数。
+
 搜索摘录保留 URL、标题和发布日期。摘录不足时，应用可按需读取完整来源页面。新闻、时间、域名和语言过滤不受支持，应用会通过现有提示显示这些限制；结果数量在本地限制。服务错误会直接显示，不会自动切换服务商。
 
 Parallel 仅支持服务端模式，包括后续研究。由于浏览器无法可靠设置项目的 User-Agent，静态部署和客户端服务商选择器不提供此选项。服务端请求遵循下方的出站代理设置。
@@ -161,14 +192,34 @@ NUXT_NO_PROXY=localhost,127.0.0.1,::1
 ```
 
 - 支持 `http`、`https`、`socks5`、`socks5h`、`socks`。
-- `http(s)` 代理全覆盖：AI 服务商、Google PSE、you.com、Parallel，以及 Tavily / Firecrawl / CRW SDK。
-- `socks*` 代理只覆盖 AI 服务商、Google PSE、you.com 和 Parallel；Tavily / Firecrawl / CRW SDK（基于 axios）不支持 SOCKS，会直连。多数代理商同一网关的 `http://` 地址可用相同凭证，要全覆盖请用 `http://`。
+- `http(s)` 代理全覆盖：AI 服务商、Google PSE、you.com、Serply、Parallel，以及 Tavily / Firecrawl / CRW SDK。
+- `socks*` 代理只覆盖 AI 服务商、Google PSE、you.com、Serply 和 Parallel；Tavily / Firecrawl / CRW SDK（基于 axios）不支持 SOCKS，会直连。多数代理商同一网关的 `http://` 地址可用相同凭证，要全覆盖请用 `http://`。
 - `NUXT_NO_PROXY` 支持 `*`、精确主机和父域名（`example.com` 同时匹配 `api.example.com`）。本地 AI 网关（Ollama、LiteLLM）和自托管抓取服务靠默认值保持直连。
 - 未设置 `NUXT_PROXY_URL` 时，兼容标准的 `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` 环境变量。
 - 日志中的代理密码会自动脱敏。
 - 客户端模式（浏览器）无法使用：浏览器没有 SOCKS 接口，请配置系统 / 浏览器代理。
 - 凭证中的特殊字符需 URL 编码（`%` 写成 `%25`、`@` 写成 `%40`、`:` 写成 `%3A`）。
 - `NUXT_PROXY_URL` 无效时服务端拒绝启动（fail-fast），不会静默直连。
+
+#### 自托管部署使用代理（例如 Helodata）
+
+如果服务器需要按地区出口或轮换出口 IP，可以把部署放在标准 HTTP/SOCKS5 代理后面。以 Helodata 为例：
+
+```bash
+# 全覆盖：AI + Google PSE + you.com + Tavily/Firecrawl SDK
+NUXT_PROXY_URL="http://YOUR_HELODATA_USERNAME:YOUR_HELODATA_PASSWORD@gate.helodata.io:7777"
+# 或 SOCKS5：AI + Google PSE + you.com
+# （Tavily/Firecrawl SDK 不支持 SOCKS，会直连）
+NUXT_PROXY_URL="socks5h://YOUR_HELODATA_USERNAME:YOUR_HELODATA_PASSWORD@gate.helodata.io:7777"
+docker run -p 3000:3000 \
+  -e NUXT_PUBLIC_SERVER_MODE=true \
+  -e NUXT_AI_API_KEY=你的AI-API密钥 \
+  -e NUXT_WEB_SEARCH_API_KEY=你的搜索API密钥 \
+  -e NUXT_PROXY_URL="$NUXT_PROXY_URL" \
+  anotia/deep-research-web-ui:latest
+```
+
+凭证请到 [Helodata](https://helodata.com?ref=deepresearchwebui2) 控制台获取。地区、城市和粘性会话的用户名格式见 [Helodata 文档](https://docs.helodata.com/)。代理行为细节见 [出站代理（仅服务端模式）](#出站代理仅服务端模式)。
 
 ---
 
@@ -219,3 +270,7 @@ MIT 协议
 ## Star History
 
 [![Star History Chart](https://star-history.dera.page/svg?repos=AnotiaWang/deep-research-web-ui&type=Date)](https://star-history.dera.page/#AnotiaWang/deep-research-web-ui&Date)
+
+## 鸣谢
+
+本项目同时在 [AtomGit](https://atomgit.com/AnotiaWang/deep-research-web-ui) 托管（国内访问更稳定），感谢 AtomGit 提供托管服务。

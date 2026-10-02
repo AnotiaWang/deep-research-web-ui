@@ -27,10 +27,6 @@
         "siliconflow": {
           "title": "SiliconFlow",
           "description": "Biedt ¥14 (€1,85) gratis credits bij registratie. Krijg één API-sleutel bij {0}."
-        },
-        "infiniai": {
-          "title": "Infiniai",
-          "description": "Na registratie kunt u zonder drempels de volwaardige DeepSeek R1 en andere inferentie-versnelde modellen gebruiken. Genereer een API key na inloggen op {0}."
         }
       }
     },
@@ -64,6 +60,12 @@
         "youcom": {
           "help": "Zoeken op het web via de You.com Search API. Werkt zonder API-sleutel (beperkt dagelijks quotum); voeg een sleutel toe op {0} voor hogere limieten.",
           "apiKeyPlaceholder": "Optioneel — laat leeg voor de gratis sleutelloze variant"
+        },
+        "parallel": {
+          "help": "Gratis zoeken en bronnen lezen zonder API-sleutel in servermodus. Openbare implementaties delen anonieme snelheidslimieten."
+        },
+        "serply": {
+          "help": "Zoeken op het web via de Serply API (Google-resultaten). Vereist een API-sleutel; vraag er een aan op {0}."
         }
       },
       "concurrencyLimitHelp": "Beperk de gelijktijdige zoektaken. Dit is handig om te voorkomen dat de zoekmachine overbelast raakt en verzoeken mislukken.",
@@ -81,6 +83,29 @@
     "depthHelp": "Aantal iteraties.",
     "breadth": "Breedte",
     "breadthHelp": "Aantal zoekopdrachten in de eerste iteratie. De zoekbreedte van elke iteratie is de helft van de vorige.",
+    "preset": "Onderzoeksmodus",
+    "presetHelp": "Grondigere modi zoeken vaker en duren langer, en verbruiken meer API-tegoed.",
+    "presets": {
+      "auto": {
+        "label": "Automatisch",
+        "description": "AI kiest een modus op basis van je onderwerp. Je kunt die vóór het zoeken wijzigen."
+      },
+      "quick": {
+        "label": "Snel",
+        "description": "Eenvoudige feitenvragen. {breadth} breed × {depth} diep, tot ~{count} zoekopdrachten."
+      },
+      "standard": {
+        "label": "Standaard",
+        "description": "De meeste onderwerpen. {breadth} breed × {depth} diep, tot ~{count} zoekopdrachten."
+      },
+      "deep": {
+        "label": "Diepgaand",
+        "description": "Complexe of brede onderwerpen. {breadth} breed × {depth} diep, tot ~{count} zoekopdrachten."
+      }
+    },
+    "advanced": "Geavanceerde instellingen",
+    "estimatedSearches": "Met deze instellingen worden tot ~{count} zoekopdrachten gepland. Het onderzoek kan eerder stoppen zodra het doel is gedekt.",
+    "autoModeHint": "In de automatische modus stelt AI breedte en diepte voor bij het stellen van vragen. Breedte of diepte aanpassen schakelt over naar handmatig.",
     "required": "Dit veld is verplicht.",
     "integerRange": "Voer een geheel getal van {min} tot {max} in.",
     "start": "Begin Onderzoek",
@@ -93,7 +118,11 @@
     "submit": "Antwoord versturen",
     "continue": "Onderzoek voortzetten",
     "error": "Fout bij het ontvangen van feedback: {0}",
-    "noQuestions": "Je vraag is al duidelijk genoeg. Er zijn geen vervolgvragen nodig — je kunt doorgaan."
+    "noQuestions": "Je vraag is al duidelijk genoeg. Er zijn geen vervolgvragen nodig — je kunt doorgaan.",
+    "researchMode": "Onderzoeksmodus",
+    "suggestedMode": "AI stelt \"{mode}\" voor: ",
+    "noSuggestedMode": "AI gaf geen advies, dus er is een standaardmodus gekozen.",
+    "modeEstimate": "Tot ~{count} zoekopdrachten."
   },
   "webBrowsing": {
     "readingSource": "Bronpagina’s lezen…",
@@ -155,6 +184,15 @@
     "webSearchProvider": "Zoekmachine provider",
     "searchLanguage": "Zoektaal",
     "configNotice": "Huidige configuratie is ingesteld door de serverbeheerder. Neem contact op met de beheerder voor wijzigingen."
+  },
+  "accessPassword": {
+    "title": "Toegangswachtwoord",
+    "description": "Deze server vereist een wachtwoord voordat je onderzoek kunt uitvoeren.",
+    "label": "Wachtwoord",
+    "submit": "Ontgrendelen",
+    "invalid": "Onjuist wachtwoord.",
+    "success": "Toegang verleend",
+    "denied": "De server heeft het verzoek geweigerd: toegangswachtwoord ontbreekt of is onjuist."
   },
   "history": {
     "title": "Geschiedenis",

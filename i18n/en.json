@@ -28,10 +28,6 @@
           "title": "SiliconFlow",
           "description": "Offers ¥14 free credits on register. Get one API key at {0}."
         },
-        "infiniai": {
-          "title": "InfiniAI",
-          "description": "After registration, you can use the full-powered DeepSeek R1 and other inference-accelerated models without any barriers. Generate an API key after logging in at {0}."
-        },
         "302-ai": {
           "title": "302.AI",
           "description": "Offers $1 free credit on register. Get one API key at {0}."
@@ -68,6 +64,12 @@
         "youcom": {
           "help": "Web search via the You.com Search API. Works without an API key (limited daily quota); add a key at {0} for higher limits.",
           "apiKeyPlaceholder": "Optional — leave empty for the keyless free tier"
+        },
+        "parallel": {
+          "help": "Free, keyless search and source reading in Server Mode. Public deployments share anonymous rate limits."
+        },
+        "serply": {
+          "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",
@@ -85,6 +87,29 @@
     "depthHelp": "Number of iterations.",
     "breadth": "Breadth",
     "breadthHelp": "Number of searches in the first iteration. The search width of each iteration is half of the previous one.",
+    "preset": "Research mode",
+    "presetHelp": "More thorough modes search more and take longer, using more API quota.",
+    "presets": {
+      "auto": {
+        "label": "Auto",
+        "description": "AI recommends a mode from your topic. You can change it before searching."
+      },
+      "quick": {
+        "label": "Quick",
+        "description": "Simple fact lookups. {breadth} wide × {depth} deep, up to ~{count} searches."
+      },
+      "standard": {
+        "label": "Standard",
+        "description": "Most topics. {breadth} wide × {depth} deep, up to ~{count} searches."
+      },
+      "deep": {
+        "label": "Deep",
+        "description": "Complex or broad topics. {breadth} wide × {depth} deep, up to ~{count} searches."
+      }
+    },
+    "advanced": "Advanced settings",
+    "estimatedSearches": "With these settings, up to ~{count} searches will be planned. Research may stop early once the goal is covered.",
+    "autoModeHint": "In Auto mode, AI recommends breadth and depth when asking its questions. Editing breadth or depth switches to manual.",
     "required": "This field is required.",
     "integerRange": "Enter a whole number from {min} to {max}.",
     "start": "Start Research",
@@ -97,7 +122,11 @@
     "submit": "Submit Answer",
     "continue": "Continue Research",
     "error": "Error getting feedback: {0}",
-    "noQuestions": "Your query is already clear enough. No follow-up questions are needed — you can continue."
+    "noQuestions": "Your query is already clear enough. No follow-up questions are needed — you can continue.",
+    "researchMode": "Research mode",
+    "suggestedMode": "AI suggests \"{mode}\": ",
+    "noSuggestedMode": "AI gave no recommendation, so a default mode was selected.",
+    "modeEstimate": "Up to ~{count} searches."
   },
   "webBrowsing": {
     "readingSource": "Reading source pages…",
@@ -159,6 +188,15 @@
     "webSearchProvider": "Web Search Provider",
     "searchLanguage": "Search Language",
     "configNotice": "Current configuration is set by the server administrator. Contact the administrator to make changes."
+  },
+  "accessPassword": {
+    "title": "Access password",
+    "description": "This server requires a password before running research.",
+    "label": "Password",
+    "submit": "Unlock",
+    "invalid": "Incorrect password.",
+    "success": "Access granted",
+    "denied": "The server rejected the request: access password missing or incorrect."
   },
   "history": {
     "title": "History",

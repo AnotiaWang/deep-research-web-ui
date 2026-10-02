@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   createResearchHistoryItem,
+  HISTORY_ITEM_LIMIT,
+  mergeHistoryItems,
   normalizeStoredHistory,
   parseImportedHistoryItem,
   updateResearchHistoryItem,
@@ -88,5 +90,26 @@ describe('history-backed research sessions', () => {
     assert.deepEqual(normalizeStoredHistory({ items: [item] }).items[0].learnings, [learning])
     const legacy = createResearchHistoryItem(research)
     assert.deepEqual(parseImportedHistoryItem(legacy).learnings, research.learnings)
+  })
+})
+
+describe('history persistence merge', () => {
+  const item = (id: string, title = id) =>
+    createResearchHistoryItem({ ...research, title }, { id, timestamp: '2026-07-15T00:00:00.000Z' })
+
+  it('keeps items created before persisted history finished loading', () => {
+    const merged = mergeHistoryItems([item('new')], [item('old-1'), item('old-2')])
+    assert.deepEqual(
+      merged.map((entry) => entry.id),
+      ['new', 'old-1', 'old-2'],
+    )
+  })
+
+  it('prefers in-memory edits on ID conflicts and applies the item limit', () => {
+    const loaded = Array.from({ length: HISTORY_ITEM_LIMIT }, (_, index) => item(`old-${index}`))
+    const merged = mergeHistoryItems([item('old-0', 'edited')], loaded)
+    assert.equal(merged.length, HISTORY_ITEM_LIMIT)
+    assert.equal(merged[0]?.title, 'edited')
+    assert.equal(merged.filter((entry) => entry.id === 'old-0').length, 1)
   })
 })

@@ -4,6 +4,7 @@ import {
   hasMeaningfulFeedbackQuestions,
   mergeFeedbackQuestions,
 } from '../app/utils/feedback.ts'
+import { generateFeedback } from '../lib/core/feedback.ts'
 
 describe('feedback question merging', () => {
   it('does not render empty streamed placeholders as questions', () => {
@@ -54,5 +55,71 @@ describe('feedback question merging', () => {
       mergeFeedbackQuestions(undefined as any, ['Only question']),
       [{ assistantQuestion: 'Only question', userAnswer: '' }],
     )
+  })
+})
+
+function mockAiConfig(output: unknown, prompts: string[]) {
+  const chunk = (delta: object, finishReason: string | null = null) =>
+    `data: ${JSON.stringify({
+      id: 'feedback',
+      object: 'chat.completion.chunk',
+      created: 0,
+      model: 'test-model',
+      choices: [{ index: 0, delta, finish_reason: finishReason }],
+    })}\n\n`
+  return {
+    provider: 'openai-compatible' as const,
+    apiKey: 'test',
+    apiBase: 'https://llm.example.com/v1',
+    model: 'test-model',
+    fetch: async (_input: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body))
+      prompts.push(body.messages.map((message: any) => message.content).join('\n'))
+      return new Response(
+        chunk({ role: 'assistant', content: JSON.stringify(output) }) +
+          chunk({}, 'stop') +
+          'data: [DONE]\n\n',
+        { headers: { 'Content-Type': 'text/event-stream' } },
+      )
+    },
+  }
+}
+
+async function collectFeedback(
+  options: Partial<Parameters<typeof generateFeedback>[0]>,
+  output: unknown,
+) {
+  const prompts: string[] = []
+  const chunks = []
+  for await (const chunk of generateFeedback({
+    query: 'Compare EV battery chemistries',
+    language: 'en',
+    aiConfig: mockAiConfig(output, prompts),
+    ...options,
+  })) {
+    chunks.push(chunk)
+  }
+  return { prompt: prompts.join('\n'), last: chunks.at(-1) }
+}
+
+describe('feedback research mode suggestion', () => {
+  it('asks for a research mode with search estimates only when requested', async () => {
+    const plain = await collectFeedback({}, { questions: [] })
+    assert.doesNotMatch(plain.prompt, /researchMode/)
+
+    const suggested = await collectFeedback(
+      { suggestResearchMode: true },
+      { questions: [], researchMode: 'deep', researchModeReason: 'Many chemistries to compare.' },
+    )
+    assert.match(suggested.prompt, /"quick" \(up to 2 searches\)/)
+    assert.match(suggested.prompt, /"deep" \(up to 20 searches\)/)
+    assert.deepEqual(suggested.last, {
+      type: 'object',
+      value: {
+        questions: [],
+        researchMode: 'deep',
+        researchModeReason: 'Many chemistries to compare.',
+      },
+    })
   })
 })

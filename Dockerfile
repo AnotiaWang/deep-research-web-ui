@@ -1,21 +1,16 @@
-FROM node:22-alpine AS deps
-
-WORKDIR /app
-
-# 只复制依赖相关文件
-COPY package.json pnpm-lock.yaml ./
-RUN npm i -g --force pnpm@9
-RUN pnpm install --frozen-lockfile --prod
-
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
+RUN npm i -g --force pnpm@9
+
+# 先只复制依赖清单：依赖未变化时可以复用安装层缓存。
+# 此时还没有源码，跳过 postinstall（nuxt prepare），nuxt build 会自行完成。
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
 COPY . .
 
 ENV NODE_OPTIONS="--max_old_space_size=2048"
-RUN npm i -g --force pnpm@9
-RUN pnpm install --frozen-lockfile
 RUN pnpm build:optimize
 
 FROM node:22-alpine AS runner
@@ -23,9 +18,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# 只复制必要的文件
+# .output 已包含运行所需的全部依赖
 COPY --from=builder /app/.output .output
-COPY --from=builder /app/package.json .
+
+# 以非 root 用户运行；.cache 用于保存 API key 轮询状态，需要可写
+RUN mkdir -p .cache && chown node:node .cache
+USER node
 
 EXPOSE 3000
 CMD ["node", ".output/server/index.mjs"]

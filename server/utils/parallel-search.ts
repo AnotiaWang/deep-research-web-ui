@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import {
@@ -50,24 +51,48 @@ function payload(value: unknown) {
 /** Each factory belongs to one research operation, including its recursive branches. */
 export function createParallelWebSearch(config: { fetch?: typeof fetch } = {}): WebSearchFunction {
   const sessionId = randomUUID()
+  const callSignals = new AsyncLocalStorage<AbortSignal>()
   // Identify aggregate project usage; never add user or installation identifiers.
   const userAgent = `deep-research-web-ui/${project.version}`
 
-  async function call(name: 'web_search' | 'web_fetch', args: object, callerSignal?: AbortSignal) {
-    throwIfAborted(callerSignal)
-    const protocolAbort = new AbortController()
-    let signal = AbortSignal.any([
-      AbortSignal.timeout(timeoutMs),
-      protocolAbort.signal,
-      ...(callerSignal ? [callerSignal] : []),
-    ])
+  type Connection = {
+    client: Client
+    transport: StreamableHTTPClientTransport
+    abort: AbortController
+    ready: Promise<void>
+  }
+  let connection: Connection | undefined
+  let closed = false
+  const sourceQueries = new Map<string, string[]>()
+
+  async function closeConnection(current: Connection) {
+    current.abort.abort(new Error('Parallel Search MCP connection closed.'))
+    try {
+      await current.transport.terminateSession()
+    } catch {
+      // Cleanup must not hide the research result or original error.
+    }
+    await current.client.close().catch(() => {})
+  }
+
+  function connect(): Connection {
+    if (connection) return connection
+    const abort = new AbortController()
     const doFetch = config.fetch ?? fetch
     const boundedFetch: typeof fetch = async (input, init) => {
       const requestSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined)
+      const callSignal = callSignals.getStore()
       const response = await doFetch(input, {
         ...init,
         redirect: 'error',
-        signal: AbortSignal.any([signal, ...(requestSignal ? [requestSignal] : [])]),
+        signal:
+          init?.method === 'DELETE'
+            ? AbortSignal.timeout(1_000)
+            : AbortSignal.any([
+                abort.signal,
+                ...(requestSignal ? [requestSignal] : []),
+                ...(callSignal ? [callSignal] : []),
+              ]),
       })
       if (!response.body) return response
       let bytes = 0
@@ -92,56 +117,81 @@ export function createParallelWebSearch(config: { fetch?: typeof fetch } = {}): 
       requestInit: { headers: { 'User-Agent': userAgent }, redirect: 'error' },
     })
     const client = new Client({ name: 'deep-research-web-ui', version: project.version })
-    // Protocol errors without a matching response ID must fail instead of waiting for timeout.
-    client.onerror = (error) => protocolAbort.abort(error)
+    // Unmatched protocol errors must fail active calls instead of waiting for timeout.
+    client.onerror = (error) => {
+      if (!callSignals.getStore()?.aborted) abort.abort(error)
+    }
+    const current: Connection = { client, transport, abort, ready: Promise.resolve() }
+    connection = current
+    current.ready = abortable(
+      client.connect(transport),
+      AbortSignal.any([abort.signal, AbortSignal.timeout(timeoutMs)]),
+    ).catch(async (error) => {
+      if (connection === current) connection = undefined
+      await closeConnection(current)
+      throw error
+    })
+    return current
+  }
+
+  async function call(name: 'web_search' | 'web_fetch', args: object, callerSignal?: AbortSignal) {
+    throwIfAborted(callerSignal)
+    if (closed) throw new Error('Parallel Search MCP research operation is closed.')
+    const current = connect()
+    const signal = AbortSignal.any([
+      AbortSignal.timeout(timeoutMs),
+      current.abort.signal,
+      ...(callerSignal ? [callerSignal] : []),
+    ])
     try {
-      await abortable(client.connect(transport), signal)
-      let cursor: string | undefined
-      const cursors = new Set<string>()
-      let found = false
-      do {
-        const page = await client.listTools(cursor ? { cursor } : undefined, { signal })
-        found ||= page.tools.some((tool) => tool.name === name)
-        cursor = page.nextCursor
-        if (cursor && cursors.has(cursor)) throw new Error('Repeated MCP discovery cursor.')
-        if (cursor) cursors.add(cursor)
-      } while (cursor)
-      if (!found) throw new Error(`Parallel Search MCP does not expose ${name}.`)
+      await abortable(current.ready, signal)
       return payload(
-        await client.callTool({ name, arguments: { ...args, session_id: sessionId } }, undefined, {
-          signal,
-          timeout: timeoutMs,
-        }),
+        await callSignals.run(signal, () =>
+          current.client.callTool(
+            { name, arguments: { ...args, session_id: sessionId } },
+            undefined,
+            {
+              signal,
+              timeout: timeoutMs,
+            },
+          ),
+        ),
       )
     } catch (error) {
       if (signal.aborted) error = signal.reason
+      // A canceled branch must not interrupt other calls sharing the connection.
+      // Service/session failures are retried only by the next explicit tool call.
+      if (!callerSignal?.aborted && connection === current) {
+        connection = undefined
+        await closeConnection(current)
+      }
       if (error instanceof StreamableHTTPError && error.code) {
         throw new Error(`Parallel Search MCP HTTP ${error.code}: ${error.message}`, {
           cause: error,
         })
       }
       throw error
-    } finally {
-      // Cleanup has its own short deadline and must not hide the original outcome.
-      signal = AbortSignal.timeout(1_000)
-      try {
-        await transport.terminateSession()
-      } catch {
-        // The next call can reconnect while keeping the research session identifier.
-      }
-      await client.close().catch(() => {})
     }
   }
 
   const search: WebSearchFunction = async (query, options = {}) => {
     const constraints = searchConstraintsSchema.parse(options)
-    const plan = resolveSearchPlan({ ...constraints, query, researchGoal: '' })
+    const plan = resolveSearchPlan({
+      ...constraints,
+      query,
+      researchGoal: options.researchGoal ?? '',
+    })
     options.onNotice?.(buildSearchFilters('parallel', { ...options, ...plan }).limitations)
     const data = await call(
       'web_search',
-      { objective: query, search_queries: [query] },
+      { objective: options.researchGoal?.trim() || query, search_queries: [query] },
       options.signal,
     )
+    for (const result of data.results) {
+      const queries = sourceQueries.get(result.url) ?? []
+      if (!queries.includes(query)) queries.push(query)
+      sourceQueries.set(result.url, queries)
+    }
     return data.results
       .flatMap<WebSearchResult>((result) => {
         const content = result.excerpts.join('\n').trim()
@@ -164,7 +214,7 @@ export function createParallelWebSearch(config: { fetch?: typeof fetch } = {}): 
       'web_fetch',
       {
         urls: [url],
-        objective: 'Read this source page to verify research evidence.',
+        ...(sourceQueries.has(url) ? { search_queries: sourceQueries.get(url) } : {}),
         full_content: true,
       },
       signal,
@@ -182,6 +232,12 @@ export function createParallelWebSearch(config: { fetch?: typeof fetch } = {}): 
       content: result.full_content,
       sourceType: 'page',
     }
+  }
+  search.close = async () => {
+    closed = true
+    const current = connection
+    connection = undefined
+    if (current) await closeConnection(current)
   }
   return search
 }

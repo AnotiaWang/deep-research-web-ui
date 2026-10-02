@@ -5,6 +5,36 @@ import { wrapLanguageModel, extractReasoningMiddleware } from 'ai'
 import type { LanguageModelV1 } from 'ai'
 import type { ConfigAi, ConfigAiProvider } from '../types/config'
 
+// Record keyed by the union so adding a provider without listing it here fails typecheck
+const AI_PROVIDERS: Record<ConfigAiProvider, true> = {
+  'openai-compatible': true,
+  siliconflow: true,
+  '302-ai': true,
+  openrouter: true,
+  requesty: true,
+  deepseek: true,
+  ollama: true,
+  litellm: true,
+}
+
+export function isSupportedAiProvider(provider: string): provider is ConfigAiProvider {
+  return Object.hasOwn(AI_PROVIDERS, provider)
+}
+
+/**
+ * Returns an error message if `provider` can't be used, or `undefined` if it's supported.
+ */
+export function getAiProviderError(provider: string): string | undefined {
+  if (isSupportedAiProvider(provider)) return undefined
+  if (provider === 'infiniai') {
+    return (
+      'AI provider "infiniai" is no longer supported. ' +
+      'Use "openai-compatible" with API base https://cloud.infini-ai.com/maas/v1 instead.'
+    )
+  }
+  return `Unknown AI provider "${provider}". Supported: ${Object.keys(AI_PROVIDERS).join(', ')}.`
+}
+
 export function isAiApiKeyRequired(provider: ConfigAiProvider) {
   return provider !== 'ollama' && provider !== 'litellm'
 }
@@ -25,7 +55,6 @@ export function getLanguageModel(config: ConfigAi) {
   } else if (
     config.provider === 'deepseek' ||
     config.provider === 'siliconflow' ||
-    config.provider === 'infiniai' ||
     // Special case if model name includes 'deepseek'
     // This ensures compatibilty with providers like Siliconflow
     config.model?.toLowerCase().includes('deepseek')
@@ -66,9 +95,6 @@ export function getApiBase(config: ConfigAi) {
   }
   if (config.provider === 'siliconflow') {
     return config.apiBase || 'https://api.siliconflow.cn/v1'
-  }
-  if (config.provider === 'infiniai') {
-    return config.apiBase || 'https://cloud.infini-ai.com/maas/v1'
   }
   if (config.provider === '302-ai') {
     return config.apiBase || 'https://api.302.ai/v1'

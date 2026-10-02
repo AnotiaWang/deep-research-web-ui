@@ -6,25 +6,109 @@ import type {
 } from '~/types/history'
 import {
   createResearchHistoryItem,
+  HISTORY_ITEM_LIMIT,
+  mergeHistoryItems,
   normalizeStoredHistory,
   parseImportedHistoryItem,
   updateResearchHistoryItem,
 } from '~/utils/history'
+import { readHistoryFromIndexedDB, writeHistoryToIndexedDB } from '~/utils/history-storage'
+
+/** Pre-IndexedDB storage; still used as a fallback when IndexedDB is unavailable. */
+const LEGACY_STORAGE_KEY = 'deep-research-history'
+const PERSIST_DELAY_MS = 300
+
+// Shared by every useHistory() caller in this tab.
+const history = ref<ResearchHistory>({ items: [] })
+let initialized = false
+let loaded = false
+let lastPersisted = ''
+let persistTimer: ReturnType<typeof setTimeout> | undefined
+let channel: BroadcastChannel | undefined
+
+function readLegacyHistory(): unknown {
+  try {
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+async function readPersistedHistory() {
+  try {
+    const stored = await readHistoryFromIndexedDB()
+    if (stored !== undefined) return { value: stored, legacy: false }
+  } catch (error) {
+    console.error('[history] IndexedDB unavailable, falling back to localStorage', error)
+  }
+  return { value: readLegacyHistory(), legacy: true }
+}
+
+async function persistHistory() {
+  const serialized = JSON.stringify(history.value)
+  if (serialized === lastPersisted) return
+  try {
+    await writeHistoryToIndexedDB(JSON.parse(serialized))
+    // IndexedDB now owns the data; drop the migrated legacy copy.
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
+  } catch (error) {
+    console.error('[history] Failed to write IndexedDB, falling back to localStorage', error)
+    try {
+      localStorage.setItem(LEGACY_STORAGE_KEY, serialized)
+    } catch (fallbackError) {
+      console.error('[history] Failed to persist research history', fallbackError)
+      return
+    }
+  }
+  lastPersisted = serialized
+  channel?.postMessage('updated')
+}
+
+async function loadPersistedHistory() {
+  const { value, legacy } = await readPersistedHistory()
+  const persisted = normalizeStoredHistory(value)
+  // Leave legacy data marked unsaved so the first persist migrates it into IndexedDB.
+  lastPersisted = legacy ? '' : JSON.stringify(persisted)
+  history.value = { items: mergeHistoryItems(history.value.items, persisted.items) }
+  loaded = true
+}
+
+function initHistory() {
+  if (initialized || !import.meta.client) return
+  initialized = true
+  void loadPersistedHistory()
+  watch(
+    history,
+    () => {
+      // Never overwrite stored history with the empty pre-load state.
+      if (!loaded) return
+      clearTimeout(persistTimer)
+      persistTimer = setTimeout(persistHistory, PERSIST_DELAY_MS)
+    },
+    { deep: true },
+  )
+  if (typeof BroadcastChannel !== 'undefined') {
+    channel = new BroadcastChannel(LEGACY_STORAGE_KEY)
+    channel.onmessage = async () => {
+      const { value } = await readPersistedHistory()
+      const persisted = normalizeStoredHistory(value)
+      lastPersisted = JSON.stringify(persisted)
+      history.value = persisted
+    }
+  }
+}
 
 export const useHistory = () => {
-  const history = useLocalStorage<ResearchHistory>('deep-research-history', {
-    items: [],
-  })
-  history.value = normalizeStoredHistory(history.value)
+  initHistory()
 
   const addHistoryItem = (item: NewResearchHistoryItem): ResearchHistoryItem => {
     const newItem = createResearchHistoryItem(item)
 
     history.value.items.unshift(newItem)
 
-    // 限制历史记录数量，最多保存100条
-    if (history.value.items.length > 100) {
-      history.value.items = history.value.items.slice(0, 100)
+    if (history.value.items.length > HISTORY_ITEM_LIMIT) {
+      history.value.items = history.value.items.slice(0, HISTORY_ITEM_LIMIT)
     }
     return newItem
   }
@@ -63,8 +147,8 @@ export const useHistory = () => {
           } else {
             history.value.items.unshift(importedItem)
 
-            if (history.value.items.length > 100) {
-              history.value.items = history.value.items.slice(0, 100)
+            if (history.value.items.length > HISTORY_ITEM_LIMIT) {
+              history.value.items = history.value.items.slice(0, HISTORY_ITEM_LIMIT)
             }
           }
           resolve(importedItem)

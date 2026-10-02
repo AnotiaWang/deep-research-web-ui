@@ -38,6 +38,20 @@ const storedHistoryContainerSchema = z.object({
   items: z.array(z.unknown()),
 })
 
+export const HISTORY_ITEM_LIMIT = 100
+
+/**
+ * Merges persisted history into items created before it finished loading.
+ * In-memory items win on ID conflicts because they are the most recent edits.
+ */
+export function mergeHistoryItems(
+  current: ResearchHistoryItem[],
+  loaded: ResearchHistoryItem[],
+): ResearchHistoryItem[] {
+  const ids = new Set(current.map((item) => item.id))
+  return [...current, ...loaded.filter((item) => !ids.has(item.id))].slice(0, HISTORY_ITEM_LIMIT)
+}
+
 interface CreateResearchHistoryItemOptions {
   id?: string
   timestamp?: string

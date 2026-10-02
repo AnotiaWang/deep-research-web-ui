@@ -6,7 +6,7 @@ import {
   canRetryResearchFromSession,
   createInitialResearchSession,
   researchSessionReducer,
-} from '../app/composables/useResearchSession.ts'
+} from '../app/utils/research-session-reducer.ts'
 
 const at = '2026-07-15T00:00:00.000Z'
 
@@ -83,6 +83,42 @@ describe('research session reducer', () => {
 
     assert.equal(session.input?.query, 'first')
     assert.equal(Object.isFrozen(session.input), true)
+  })
+
+  it('applies breadth and depth confirmed after feedback to the research input', () => {
+    let session = researchSessionReducer(createInitialResearchSession(), {
+      type: 'BEGIN_FEEDBACK',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      input: { query: 'topic', breadth: 2, depth: 2, numQuestions: 3 },
+      at,
+    })
+    session = researchSessionReducer(session, {
+      type: 'FEEDBACK_SUCCEEDED',
+      sessionId: 'session-1',
+      operationId: 'operation-1',
+      feedback: [],
+      at,
+    })
+    const unchanged = researchSessionReducer(session, {
+      type: 'BEGIN_RESEARCH',
+      sessionId: 'session-1',
+      operationId: 'operation-2',
+      feedback: [],
+      at,
+    })
+    const overridden = researchSessionReducer(session, {
+      type: 'BEGIN_RESEARCH',
+      sessionId: 'session-1',
+      operationId: 'operation-2',
+      feedback: [],
+      settings: { breadth: 4, depth: 3 },
+      at,
+    })
+
+    assert.equal(unchanged.input, session.input)
+    assert.deepEqual(overridden.input, { query: 'topic', breadth: 4, depth: 3, numQuestions: 3 })
+    assert.equal(Object.isFrozen(overridden.input), true)
   })
 
   it('ignores completion from an obsolete operation', () => {

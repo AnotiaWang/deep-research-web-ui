@@ -7,6 +7,7 @@ import axios from 'axios'
 import { createProxyFetch, resolveProxyConfig } from '../server/utils/proxy.ts'
 import type { RuntimeConfig } from 'nuxt/schema'
 import { createParallelWebSearch } from '../server/utils/parallel-search.ts'
+import project from '../public/version.json' with { type: 'json' }
 import { searchWeb } from '../lib/core/web-search.ts'
 
 const globals = globalThis as any
@@ -61,7 +62,7 @@ const toolResult = (data: unknown) => ({
   structuredContent: data,
 })
 
-it('loads the anonymous server provider, maps useful results, and reuses research metadata across reconnects and reading', async () => {
+it('loads the anonymous server provider, maps useful results, and reuses research metadata across searches and reading', async () => {
   const mock = fixture((request) =>
     toolResult({
       results: [
@@ -82,15 +83,21 @@ it('loads the anonymous server provider, maps useful results, and reuses researc
     } as RuntimeConfig
     const search = createServerWebSearch(runtimeConfig)
     assert.equal(search.provider, 'parallel')
-    assert.deepEqual(await search('official source', { maxResults: 1 }), [
-      {
-        url: source.url,
-        title: 'Article',
-        publishedAt: '2026-09-15',
-        content: 'First excerpt\nSecond excerpt',
-        sourceType: 'search-result',
-      },
-    ])
+    assert.deepEqual(
+      await search('official source', {
+        maxResults: 1,
+        researchGoal: 'Find official evidence for the research question',
+      }),
+      [
+        {
+          url: source.url,
+          title: 'Article',
+          publishedAt: '2026-09-15',
+          content: 'First excerpt\nSecond excerpt',
+          sourceType: 'search-result',
+        },
+      ],
+    )
     await search('follow-up query', {})
     assert.deepEqual(await search.readSource!(source.url, {}), {
       url: source.url,
@@ -104,18 +111,28 @@ it('loads the anonymous server provider, maps useful results, and reuses researc
     const calls = mock.requests.filter(({ rpc }) => rpc.method === 'tools/call')
     assert.equal(calls.length, 4)
     assert.deepEqual(calls[0]!.rpc.params.arguments.search_queries, ['official source'])
-    assert.equal(calls[0]!.rpc.params.arguments.objective, 'official source')
+    assert.equal(
+      calls[0]!.rpc.params.arguments.objective,
+      'Find official evidence for the research question',
+    )
+    assert.deepEqual(calls[2]!.rpc.params.arguments.search_queries, [
+      'official source',
+      'follow-up query',
+    ])
     assert.equal(calls[2]!.rpc.params.arguments.full_content, true)
     assert.deepEqual(calls[2]!.rpc.params.arguments.urls, [source.url])
     assert.ok(
-      calls.every(({ headers }) => headers.get('User-Agent') === 'deep-research-web-ui/1.2.0'),
+      calls.every(
+        ({ headers }) => headers.get('User-Agent') === `deep-research-web-ui/${project.version}`,
+      ),
     )
     const ids = calls.map(({ rpc }) => rpc.params.arguments.session_id)
     assert.match(ids[0], /^[0-9a-f-]{36}$/)
     assert.equal(ids[0], ids[1])
     assert.equal(ids[0], ids[2])
     assert.notEqual(ids[0], ids[3])
-    assert.equal(mock.requests.filter(({ rpc }) => rpc.method === 'tools/list').length, 4)
+    assert.equal(mock.requests.filter(({ rpc }) => rpc.method === 'tools/list').length, 0)
+    assert.equal(mock.requests.filter(({ rpc }) => rpc.method === 'initialize').length, 2)
   } finally {
     globalThis.fetch = previous
   }
@@ -231,8 +248,12 @@ it('keeps successful evidence when negotiated session cleanup fails', async () =
       response.headers.set('Mcp-Session-Id', 'transport-session')
     return response
   }
-  assert.equal((await createParallelWebSearch({ fetch })('query', {}))[0]?.url, source.url)
+  const search = createParallelWebSearch({ fetch })
+  assert.equal((await search('query', {}))[0]?.url, source.url)
+  assert.equal(deletes, 0)
+  await search.close!()
   assert.equal(deletes, 1)
+  await assert.rejects(() => search('query', {}), /closed/)
 })
 
 it('enforces a response byte bound before the SDK buffers the tool envelope', async () => {
@@ -304,7 +325,10 @@ it('routes the server provider through the configured proxy with attribution and
     )
     assert.equal(tool.proxy.host, 'proxy.example')
     assert.equal(tool.proxy.port, 8080)
-    assert.equal(new Headers(tool.headers).get('User-Agent'), 'deep-research-web-ui/1.2.0')
+    assert.equal(
+      new Headers(tool.headers).get('User-Agent'),
+      `deep-research-web-ui/${project.version}`,
+    )
     assert.equal(tool.maxRedirects, 0)
     assert.equal(tool.responseType, 'stream')
   } finally {
@@ -352,5 +376,153 @@ it('prevents a proxied request from forwarding its body through a redirect to an
       new Promise<void>((resolve) => proxy.close(() => resolve())),
       new Promise<void>((resolve) => destination.close(() => resolve())),
     ])
+  }
+})
+
+it('shares initialization across concurrent calls and retains per-source queries', async () => {
+  const mock = fixture((request) =>
+    toolResult({
+      results: [
+        {
+          ...source,
+          url:
+            request.params.name === 'web_search'
+              ? `https://example.com/${request.params.arguments.search_queries[0]}`
+              : source.url,
+          full_content: 'Evidence',
+        },
+      ],
+    }),
+  )
+  const search = createParallelWebSearch({ fetch: mock.fetch })
+  await Promise.all([search('alpha', {}), search('beta', {})])
+  await search.readSource!('https://example.com/alpha', {})
+  const calls = mock.requests.filter(({ rpc }) => rpc.method === 'tools/call')
+  assert.deepEqual(calls[2]!.rpc.params.arguments.search_queries, ['alpha'])
+  assert.equal(mock.requests.filter(({ rpc }) => rpc.method === 'initialize').length, 1)
+  await search.close!()
+})
+
+it('reconnects after a failed session while keeping the operation ID', async () => {
+  let fail = true
+  const mock = fixture(() =>
+    fail ? new Response('Expired session', { status: 404 }) : toolResult({ results: [source] }),
+  )
+  const search = createParallelWebSearch({ fetch: mock.fetch })
+  await assert.rejects(() => search('first', {}), /404/)
+  fail = false
+  assert.equal((await search('second', {}))[0]?.url, source.url)
+  const calls = mock.requests.filter(({ rpc }) => rpc.method === 'tools/call')
+  assert.equal(calls[0]!.rpc.params.arguments.session_id, calls[1]!.rpc.params.arguments.session_id)
+  assert.equal(mock.requests.filter(({ rpc }) => rpc.method === 'initialize').length, 2)
+  await search.close!()
+})
+
+it('cancels one in-flight request without canceling its concurrent sibling', async () => {
+  const controller = new AbortController()
+  let started!: () => void
+  const entered = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const mock = fixture(() => toolResult({ results: [source] }))
+  const search = createParallelWebSearch({
+    fetch: async (input, init) => {
+      const rpc = init?.body ? JSON.parse(String(init.body)) : undefined
+      if (rpc?.method === 'tools/call' && rpc.params.arguments.search_queries[0] === 'cancel') {
+        started()
+        return await new Promise<Response>((_resolve, reject) => {
+          init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), {
+            once: true,
+          })
+        })
+      }
+      return mock.fetch(input, init)
+    },
+  })
+  const canceled = search('cancel', { signal: controller.signal })
+  const rejection = assert.rejects(canceled, /Canceled/)
+  await entered
+  const sibling = search('keep', {})
+  controller.abort(new DOMException('Canceled', 'AbortError'))
+  await rejection
+  assert.equal((await sibling)[0]?.url, source.url)
+  assert.equal((await search('after cancellation', {}))[0]?.url, source.url)
+  assert.equal(mock.requests.filter(({ rpc }) => rpc.method === 'initialize').length, 1)
+  await search.close!()
+})
+
+it('closes an operation during initialization without issuing a tool request', async () => {
+  let started!: () => void
+  const entered = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const search = createParallelWebSearch({
+    fetch: async (_input, init) => {
+      started()
+      return await new Promise<Response>((_resolve, reject) => {
+        init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true })
+      })
+    },
+  })
+  const pending = assert.rejects(() => search('query', {}), /closed/)
+  await entered
+  await search.close!()
+  await pending
+  await search.close!()
+})
+
+it('carries the native research planner through keyless search to a final cited learning', async () => {
+  const { MockLanguageModelV1, convertArrayToReadableStream } = await import('ai/test')
+  const { deepResearch } = await import('../lib/core/deep-research.ts')
+  const previousModel = globals.getLanguageModel
+  const previousFetch = globalThis.fetch
+  const goal = 'Find the official project release evidence'
+  const finding = {
+    url: source.url,
+    learning: 'The project released version one.',
+    quote: 'The project released version one.',
+  }
+  const outputs = [
+    { queries: [{ query: 'official project release', researchGoal: goal }] },
+    { learnings: [finding], relevantUrls: [source.url], followUpQuestions: [] },
+  ]
+  const mock = fixture(() => toolResult({ results: [{ ...source, excerpts: [finding.quote] }] }))
+  globalThis.fetch = mock.fetch
+  globals.getLanguageModel = () =>
+    new MockLanguageModelV1({
+      doStream: async () => ({
+        rawCall: { rawPrompt: '', rawSettings: {} },
+        stream: convertArrayToReadableStream([
+          { type: 'text-delta', textDelta: JSON.stringify(outputs.shift()) },
+          { type: 'finish', finishReason: 'stop', usage: { promptTokens: 1, completionTokens: 1 } },
+        ]),
+      }),
+    })
+  const search = createServerWebSearch({
+    public: { webSearchProvider: 'parallel' },
+  } as RuntimeConfig)
+  const steps: any[] = []
+  try {
+    const result = await deepResearch({
+      query: goal,
+      breadth: 1,
+      maxDepth: 1,
+      currentDepth: 1,
+      languageCode: 'en',
+      aiConfig: { provider: 'openai-compatible', model: 'mock' },
+      onProgress: (step) => steps.push(step),
+      webSearchFunction: search,
+    })
+    assert.equal(outputs.length, 0)
+    assert.equal(result.learnings[0]?.learning, finding.learning)
+    assert.equal(result.learnings[0]?.url, source.url)
+    assert.equal(steps.at(-1)?.type, 'complete')
+    const args = mock.requests.find(({ rpc }) => rpc.method === 'tools/call')!.rpc.params.arguments
+    assert.equal(args.objective, goal)
+    assert.deepEqual(args.search_queries, ['official project release'])
+  } finally {
+    await search.close!()
+    globals.getLanguageModel = previousModel
+    globalThis.fetch = previousFetch
   }
 })

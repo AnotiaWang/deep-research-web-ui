@@ -9,6 +9,51 @@ export const researchInputLimits = {
   breadth: { min: 1, max: 8 },
 } as const
 
+export const researchPresets = {
+  quick: { breadth: 2, depth: 1 },
+  standard: { breadth: 2, depth: 2 },
+  deep: { breadth: 4, depth: 3 },
+} as const
+
+export type ResearchPreset = keyof typeof researchPresets
+export type ResearchDepthSettings = { breadth: number; depth: number }
+
+export const researchPresetKeys = Object.keys(researchPresets) as [
+  ResearchPreset,
+  ...ResearchPreset[],
+]
+
+export function isResearchPreset(value: unknown): value is ResearchPreset {
+  return typeof value === 'string' && Object.hasOwn(researchPresets, value)
+}
+
+export function findResearchPreset(input: {
+  breadth: unknown
+  depth: unknown
+}): ResearchPreset | undefined {
+  return researchPresetKeys.find(
+    (key) =>
+      Number(input.breadth) === researchPresets[key].breadth &&
+      Number(input.depth) === researchPresets[key].depth,
+  )
+}
+
+/**
+ * Upper bound of planned search queries: each level spawns `ceil(breadth / 2)`
+ * follow-up queries per node, mirroring `deepResearch` in lib/core/deep-research.ts.
+ */
+export function estimateMaxSearches(breadth: number, depth: number) {
+  let width = breadth
+  let nodes = breadth
+  let total = 0
+  for (let level = 1; level <= depth; level++) {
+    total += nodes
+    width = Math.ceil(width / 2)
+    nodes *= width
+  }
+  return total
+}
+
 const requiredText = z.string().trim().min(1)
 const SUPPORTED_LOCALES = ['en', 'zh', 'nl', 'ko'] as const
 
@@ -43,7 +88,7 @@ export const researchInputSchema = z.object({
 
 export const feedbackRequestSchema = researchInputSchema
   .pick({ query: true, numQuestions: true })
-  .extend({ language: requiredText })
+  .extend({ language: requiredText, suggestResearchMode: z.boolean().optional() })
   .passthrough()
 
 export const researchRequestSchema = researchInputSchema

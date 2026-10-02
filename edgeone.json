@@ -3,7 +3,7 @@
   "buildCommand": "pnpm generate:optimize",
   "installCommand": "pnpm install",
   "outputDirectory": ".output/public",
-  "nodeVersion": "20.18.0",
+  "nodeVersion": "22.21.1",
   "headers": [
     {
       "source": "/version.json",

@@ -19,8 +19,8 @@ Features:
 
 Currently available providers:
 
-- AI: OpenAI compatible, [ApiSmart](https://www.apismart.ai), SiliconFlow, InfiniAI, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM and more
-- Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE
+- AI: OpenAI compatible, [ApiSmart](https://www.apismart.ai), SiliconFlow, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM and more
+- Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE, You.com, [Serply](https://serply.io), Parallel (keyless, Server Mode only)
 
 Please give a 🌟 Star if you like this project!
 
@@ -40,6 +40,14 @@ Please give a 🌟 Star if you like this project!
 
 <a href="https://www.apismart.ai/" target="_blank">
 <img width="100" alt="ApiSmart" src="https://github.com/user-attachments/assets/bc5255ed-7354-41cd-81ec-fd515fe833ff" />
+</a>
+
+---
+
+<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">Helodata</a> provides global proxy infrastructure covering 195+ countries and regions, with 80M+ ethically sourced residential IPs. We offer Residential, ISP, Unlimited Residential, Mobile, and Datacenter proxies for reliable data access across AI, web scraping, and automation workflows. Sign up using the promo code **`DRWEB`** to enjoy an exclusive 10% discount!
+
+<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">
+<img width="852" alt="Helodata" src="https://github.com/user-attachments/assets/886d4c52-b558-443c-8b78-c2d46b12f9fb" />
 </a>
 
 ---
@@ -116,6 +124,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NUXT_PUBLIC_SERVER_MODE` | Enable server mode | `false` |
+| `NUXT_ACCESS_PASSWORD` | Optional password required to call the `/api` routes | - |
 | `NUXT_AI_API_KEY` | AI provider API key | - |
 | `NUXT_AI_API_BASE` | AI provider base URL | - |
 | `NUXT_WEB_SEARCH_API_KEY` | Web search API key | - |
@@ -140,16 +149,18 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 
 | Type | Supported values |
 |------|------------------|
-| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `infiniai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `parallel` (Server Mode only) |
+| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
+| Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel` (Server Mode only) |
 
 Notes:
 
-- `NUXT_WEB_SEARCH_API_KEY` supports comma-separated keys for Tavily and Google PSE, for example `key1,key2,key3`.
+- When `NUXT_ACCESS_PASSWORD` is set, visitors must enter it before running research. Strongly recommended for publicly reachable server-mode deployments, since the server's API keys are otherwise usable by anyone.
+- `NUXT_WEB_SEARCH_API_KEY` supports comma-separated keys for Tavily, Google PSE and Serply, for example `key1,key2,key3`.
 - Google PSE requires both `NUXT_WEB_SEARCH_API_KEY` and `NUXT_PUBLIC_GOOGLE_PSE_ID`.
 - Firecrawl self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
 - fastCRW (`crw`) is a Firecrawl-compatible web scraper (single binary; self-host or cloud). It defaults to the cloud base `https://fastcrw.com/api` and reads the key from `NUXT_WEB_SEARCH_API_KEY` (document as `CRW_API_KEY`); self-hosted deployments can set `NUXT_WEB_SEARCH_API_BASE`.
 - You.com (`youcom`) reads its key from `NUXT_WEB_SEARCH_API_KEY` (optional, comma-separated keys supported for rotation). Without a key it uses the keyless endpoint with a limited daily quota; get a key at https://you.com/platform/api-keys.
+- Serply (`serply`) returns Google web and news results through the [Serply API](https://serply.io/docs) and reads its key from `NUXT_WEB_SEARCH_API_KEY` (comma-separated keys supported for rotation). Time range, news intent, language and domain filters are applied natively; explicit publication-date windows are not.
 - Ollama uses `http://localhost:11434/v1` as the default API base. When running the app inside Docker, `localhost` refers to the container itself, so set `NUXT_AI_API_BASE` to a reachable host or Docker network address if Ollama runs outside the container.
 - LiteLLM uses `http://localhost:4000/v1` as the default API base. Its API key is optional when the proxy does not require authentication; set `NUXT_AI_API_BASE` when the proxy is not reachable at the default local address.
 - Requesty uses `https://router.requesty.ai/v1` as the default API base and expects model IDs in `provider/model` format, such as `openai/gpt-4o`.
@@ -167,6 +178,8 @@ Keep your AI provider configured as usual. Parallel search needs no Parallel acc
 
 This provider uses the free, rate-limited [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) at `https://search.parallel.ai/mcp`. Searches send queries and objectives to Parallel; on-demand page reading sends source URLs. Related calls share a random research session ID. Requests include `deep-research-web-ui/<app version>` as their User-Agent so Parallel can measure aggregate project usage. See Parallel's [Customer Terms](https://parallel.ai/customer-terms) and [Privacy Policy](https://parallel.ai/privacy-policy).
 
+Public Server Mode deployments share one outbound IP, so users share the anonymous free-tier rate limits. Reduce concurrency if requests are rate-limited.
+
 Search excerpts retain their URLs, titles and publication dates. The app can also request full source pages when excerpts are insufficient. News, time, domain and language filters are unsupported and appear through the app's existing limitation notices. The result count is capped locally. Service errors are surfaced without switching providers.
 
 Parallel is available only in Server Mode, including follow-ups. Static deployments and the Client Mode provider picker do not support it because browsers cannot reliably send the project User-Agent. Server requests honor the outbound proxy settings below.
@@ -181,14 +194,34 @@ NUXT_NO_PROXY=localhost,127.0.0.1,::1
 ```
 
 - Supported schemes: `http`, `https`, `socks5`, `socks5h`, `socks`.
-- `http(s)` proxies cover everything: AI providers, Google PSE, you.com, Parallel, and the Tavily / Firecrawl / CRW SDKs.
-- `socks*` proxies cover AI providers, Google PSE, you.com and Parallel; the Tavily / Firecrawl / CRW SDKs (axios-based) cannot speak SOCKS and will connect directly. Use the `http://` endpoint of the same proxy (same credentials on most providers) for full coverage.
+- `http(s)` proxies cover everything: AI providers, Google PSE, you.com, Serply, Parallel, and the Tavily / Firecrawl / CRW SDKs.
+- `socks*` proxies cover AI providers, Google PSE, you.com, Serply and Parallel; the Tavily / Firecrawl / CRW SDKs (axios-based) cannot speak SOCKS and will connect directly. Use the `http://` endpoint of the same proxy (same credentials on most providers) for full coverage.
 - `NUXT_NO_PROXY` accepts `*`, exact hosts and parent domains (`example.com` also matches `api.example.com`). Local AI gateways (Ollama, LiteLLM) and self-hosted scrapers stay direct via the default list.
 - Standard `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` env vars are honored as fallback when `NUXT_PROXY_URL` is unset.
 - Proxy credentials are redacted in logs.
 - Client Mode (browser) cannot use this: browsers have no SOCKS API. Configure a system / browser proxy instead.
 - URL-encode special characters in credentials (`%` as `%25`, `@` as `%40`, `:` as `%3A`).
 - An invalid `NUXT_PROXY_URL` fails server startup (fail-fast) instead of silently going direct.
+
+#### Using a proxy (e.g. Helodata) with self-hosted deployments
+
+If your server needs geo-targeted or rotating egress IPs, run the deployment behind a standard HTTP/SOCKS5 proxy. Example with Helodata:
+
+```bash
+# Full coverage: AI + Google PSE + you.com + Tavily/Firecrawl SDKs
+NUXT_PROXY_URL="http://YOUR_HELODATA_USERNAME:YOUR_HELODATA_PASSWORD@gate.helodata.io:7777"
+# Or SOCKS5: AI + Google PSE + you.com
+# (Tavily/Firecrawl SDKs can't speak SOCKS and will connect directly)
+NUXT_PROXY_URL="socks5h://YOUR_HELODATA_USERNAME:YOUR_HELODATA_PASSWORD@gate.helodata.io:7777"
+docker run -p 3000:3000 \
+  -e NUXT_PUBLIC_SERVER_MODE=true \
+  -e NUXT_AI_API_KEY=your-ai-api-key \
+  -e NUXT_WEB_SEARCH_API_KEY=your-search-api-key \
+  -e NUXT_PROXY_URL="$NUXT_PROXY_URL" \
+  anotia/deep-research-web-ui:latest
+```
+
+Get credentials from your [Helodata](https://helodata.com?ref=deepresearchwebui2) dashboard. See [Helodata docs](https://docs.helodata.com/) for region / city / sticky-session username format. For proxy behavior details, see [Outbound proxy (Server Mode only)](#outbound-proxy-server-mode-only).
 
 ---
 
@@ -241,3 +274,7 @@ MIT
 ## Star History
 
 [![Star History Chart](https://star-history.dera.page/svg?repos=AnotiaWang/deep-research-web-ui&type=Date)](https://star-history.dera.page/#AnotiaWang/deep-research-web-ui&Date)
+
+## Acknowledgements
+
+The project is also hosted on [AtomGit](https://atomgit.com/AnotiaWang/deep-research-web-ui), which is more accessible from mainland China. Thanks to AtomGit for the hosting.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { getApiBase, isAiApiKeyRequired } from '../shared/utils/ai-model.ts'
+import { getAiProviderError, getApiBase, isAiApiKeyRequired } from '../shared/utils/ai-model.ts'
 
 describe('getApiBase', () => {
   it('returns the default Requesty router URL', () => {
@@ -46,5 +46,23 @@ describe('isAiApiKeyRequired', () => {
     assert.equal(isAiApiKeyRequired('openrouter'), true)
     assert.equal(isAiApiKeyRequired('requesty'), true)
     assert.equal(isAiApiKeyRequired('deepseek'), true)
+  })
+})
+
+describe('getAiProviderError', () => {
+  it('accepts supported providers', () => {
+    assert.equal(getAiProviderError('openai-compatible'), undefined)
+    assert.equal(getAiProviderError('litellm'), undefined)
+  })
+
+  it('rejects the removed infiniai provider with a migration hint', () => {
+    const error = getAiProviderError('infiniai')
+    assert.match(error!, /no longer supported/)
+    assert.match(error!, /cloud\.infini-ai\.com\/maas\/v1/)
+  })
+
+  it('rejects unknown providers', () => {
+    assert.match(getAiProviderError('foo')!, /Unknown AI provider "foo"/)
+    assert.match(getAiProviderError('toString')!, /Unknown AI provider/)
   })
 })
