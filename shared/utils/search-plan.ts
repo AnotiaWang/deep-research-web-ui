@@ -66,6 +66,8 @@ export function searchQueryGuidance(provider?: ConfigWebSearchProvider) {
     'Prefer structured time and domain fields when available. Keep user-required exact identifiers and phrases when rewriting; simplify incidental wording, not the research constraints.'
   if (provider === 'firecrawl')
     return `${common} Current provider: Firecrawl. Supported query syntax: quoted exact phrases, -excluded terms, site:, filetype:, intitle:, inurl:. Use sparingly when the task benefits, e.g. intitle:"retrieval augmented generation" filetype:pdf. Boolean groups are not advertised by this adapter.`
+  if (provider === 'parallel')
+    return `${common} Current provider: Parallel. Supported query syntax: quoted exact phrases, -excluded terms, site:, filetype:, intitle:, inurl:. Use operators when they help the research goal.`
   if (provider === 'google-pse')
     return `${common} Current provider: Google PSE. Supported query syntax: quoted phrases, OR between closely related alternatives, -excluded terms, site:, filetype:. Avoid mixing independent research goals in one Boolean expression.`
   return `${common} Current provider: ${provider ?? 'unspecified'}. Use focused keywords, exact identifier text, or a concise natural-language query. Advanced operators are not confirmed for this adapter; express filters through supported structured fields. Do not assume Google or academic-database syntax works here.`
