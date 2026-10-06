@@ -46,6 +46,13 @@
   const loading = ref(false)
   const loadingExportPdf = ref(false)
   const loadingExportMarkdown = ref(false)
+  const loadingPublish = ref(false)
+  const publishUrl = ref('')
+  const publishClaimUrl = ref('')
+  const publishStep = ref('')
+  const publishButtonText = ref('')
+  const publishAgentPrompt = ref('')
+  let deployTextInterval: ReturnType<typeof setInterval> | null = null
   const reasoningContent = ref('')
   const reportContent = ref('')
   const reportContainerRef = ref<HTMLElement>()
@@ -90,7 +97,8 @@
       !reportContent.value ||
       loading.value ||
       loadingExportPdf.value ||
-      loadingExportMarkdown.value,
+      loadingExportMarkdown.value ||
+      loadingPublish.value,
   )
 
   const reportHtml = computed(() => {
@@ -129,7 +137,7 @@
     tooltipElement = undefined
   }
 
-  onUnmounted(removeTooltip)
+  onUnmounted(() => { removeTooltip(); stopDeployTextCycle() })
 
   // 设置 tooltip 事件监听
   function setupTooltips() {
@@ -322,6 +330,92 @@
     }
   }
 
+  function stopDeployTextCycle() {
+    if (deployTextInterval) { clearInterval(deployTextInterval); deployTextInterval = null }
+  }
+
+  function startDeployTextCycle() {
+    stopDeployTextCycle()
+    const main = t('researchReport.publishStepDeploying')
+    const alt = t('researchReport.publishStepDeployingAlt')
+    let showMain = true
+    publishButtonText.value = main
+    deployTextInterval = setInterval(() => {
+      showMain = !showMain
+      publishButtonText.value = showMain ? main : alt
+    }, showMain ? 10_000 : 5_000)
+    // Start with main for 10s, then swap
+    setTimeout(() => {
+      if (deployTextInterval) {
+        showMain = false
+        publishButtonText.value = alt
+      }
+    }, 10_000)
+  }
+
+  async function publishPage() {
+    if (!reportContent.value) return
+
+    loadingPublish.value = true
+    publishUrl.value = ''
+    publishClaimUrl.value = ''
+    publishStep.value = ''
+    publishButtonText.value = ''
+    publishAgentPrompt.value = ''
+    try {
+      const { publishReport, buildAgentPrompt } = await import('~~/lib/publish/cohesivity')
+      const result = await publishReport(
+        reportHtml.value,
+        props.query,
+        (step) => {
+          publishStep.value = step
+          stopDeployTextCycle()
+          if (step === 'creating') publishButtonText.value = t('researchReport.publishStepCreating')
+          else if (step === 'provisioning') publishButtonText.value = t('researchReport.publishStepProvisioning')
+          else if (step === 'deploying') startDeployTextCycle()
+          else if (step === 'claiming') publishButtonText.value = t('researchReport.publishStepClaiming')
+          else publishButtonText.value = ''
+        },
+      )
+      stopDeployTextCycle()
+      publishUrl.value = result.url
+      publishClaimUrl.value = result.claimUrl || ''
+      publishAgentPrompt.value = buildAgentPrompt({
+        tenantId: result.tenantId,
+        managementKey: result.managementKey,
+        applicationKey: result.applicationKey,
+        expiresAt: result.expiresAt,
+      })
+      publishButtonText.value = ''
+    } catch (e: any) {
+      console.error('Publish failed:', e)
+      stopDeployTextCycle()
+      publishButtonText.value = ''
+      toast.add({
+        title: t('researchReport.publishFailed'),
+        description: e.message,
+        duration: 10_000,
+      })
+    } finally {
+      loadingPublish.value = false
+    }
+  }
+
+  async function copyAgentPrompt() {
+    try {
+      await navigator.clipboard.writeText(publishAgentPrompt.value)
+      toast.add({
+        title: t('researchReport.agentPromptCopied'),
+        duration: 3_000,
+      })
+    } catch {
+      toast.add({
+        title: t('researchReport.agentPromptCopyFailed'),
+        duration: 5_000,
+      })
+    }
+  }
+
   function displayReport(report: string, keepEvidence = false) {
     activeReport += 1
     // 直接显示已有的报告内容
@@ -391,6 +485,43 @@
       >
         {{ $t('researchReport.exportPdf') }}
       </UButton>
+      <UButton
+        color="primary"
+        variant="ghost"
+        icon="i-lucide-globe"
+        size="sm"
+        :disabled="isExportButtonDisabled"
+        :loading="loadingPublish"
+        @click="publishPage"
+      >
+        {{ publishButtonText || $t('researchReport.publishPage') }}
+      </UButton>
+    </div>
+
+    <div
+      v-if="publishUrl"
+      class="mb-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-sm space-y-2"
+    >
+      <div class="flex items-center gap-2">
+        <UIcon name="i-lucide-globe" class="text-primary-500 shrink-0" />
+        <a :href="publishUrl" target="_blank" class="text-primary-600 dark:text-primary-400 font-medium break-all">{{ publishUrl }}</a>
+      </div>
+      <p class="text-gray-600 dark:text-gray-400">
+        {{ $t('researchReport.publishedWith') }}
+      </p>
+      <div class="flex flex-wrap gap-3 mt-1">
+        <a
+          v-if="publishClaimUrl"
+          :href="publishClaimUrl"
+          target="_blank"
+          class="text-primary-600 dark:text-primary-400 underline text-xs"
+        >{{ $t('researchReport.claimPage') }}</a>
+        <button
+          v-if="publishAgentPrompt"
+          class="text-xs text-gray-500 dark:text-gray-400 underline cursor-pointer"
+          @click="copyAgentPrompt"
+        >{{ $t('researchReport.copyAgentPrompt') }}</button>
+      </div>
     </div>
 
     <ResearchEvidence
