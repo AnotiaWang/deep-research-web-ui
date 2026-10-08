@@ -65,6 +65,9 @@
           "help": "Web search via the You.com Search API. Works without an API key (limited daily quota); add a key at {0} for higher limits.",
           "apiKeyPlaceholder": "Optional — leave empty for the keyless free tier"
         },
+        "parallel": {
+          "help": "Free, keyless search and source reading in Server Mode. Public deployments share anonymous rate limits."
+        },
         "serply": {
           "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
         }

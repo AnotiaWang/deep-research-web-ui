@@ -130,6 +130,17 @@
       _help: t('settings.webSearch.providers.youcom.help'),
       link: 'https://you.com/platform/api-keys',
     },
+    ...(isServerMode.value
+      ? [
+          {
+            label: 'Parallel Search MCP',
+            value: 'parallel',
+            help: 'settings.webSearch.providers.parallel.help',
+            _help: t('settings.webSearch.providers.parallel.help'),
+            link: 'https://docs.parallel.ai/integrations/mcp/search-mcp',
+          },
+        ]
+      : []),
     {
       label: 'Serply',
       value: 'serply',
@@ -358,7 +369,10 @@
               </UFormField>
               <UFormField
                 :label="$t('settings.webSearch.apiKey')"
-                :required="!config.webSearch.apiBase && config.webSearch.provider !== 'youcom'"
+                :required="
+                  !config.webSearch.apiBase &&
+                  !['youcom', 'parallel'].includes(config.webSearch.provider)
+                "
               >
                 <PasswordInput
                   v-model="config.webSearch.apiKey"

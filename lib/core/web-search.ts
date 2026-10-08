@@ -16,6 +16,7 @@ import type { ConfigWebSearchProvider } from '~~/shared/types/config'
 import type { WebSearchResult } from '~~/shared/types/types'
 
 export type WebSearchOptions = SearchConstraints & {
+  researchGoal?: string
   maxResults?: number
   /** Search language. Unsupported provider filters are reported through onNotice. */
   lang?: string
@@ -29,6 +30,7 @@ export type WebSearchFunction = ((
 ) => Promise<WebSearchResult[]>) & {
   provider?: ConfigWebSearchProvider
   readSource?: ReadSourceFunction
+  close?: () => Promise<void>
 }
 
 export type WebSearchConfig = {
@@ -151,7 +153,7 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
       limitations: hasDates ? ['time' as const] : [],
     }
   }
-  if (provider === 'youcom')
+  if (provider === 'youcom' || provider === 'parallel')
     return {
       // This adapter does not apply native filters. A mixed web/news
       // response does not enforce the caller's news intent.
@@ -477,6 +479,8 @@ export async function searchWeb(
       return searchWithGooglePse(config, query, options)
     case 'youcom':
       return searchWithYoucom(config, query, options)
+    case 'parallel':
+      throw new Error('Parallel Search MCP requires Server Mode (NUXT_PUBLIC_SERVER_MODE=true).')
     case 'serply':
       return searchWithSerply(config, query, options)
     case 'tavily':

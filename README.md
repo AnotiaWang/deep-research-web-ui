@@ -20,7 +20,7 @@ Features:
 Currently available providers:
 
 - AI: OpenAI compatible, [ApiSmart](https://www.apismart.ai), SiliconFlow, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM and more
-- Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE, You.com, [Serply](https://serply.io)
+- Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE, You.com, [Serply](https://serply.io), Parallel (keyless, Server Mode only)
 
 Please give a 🌟 Star if you like this project!
 
@@ -150,7 +150,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | Type | Supported values |
 |------|------------------|
 | AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply` |
+| Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel` (Server Mode only) |
 
 Notes:
 
@@ -165,6 +165,25 @@ Notes:
 - LiteLLM uses `http://localhost:4000/v1` as the default API base. Its API key is optional when the proxy does not require authentication; set `NUXT_AI_API_BASE` when the proxy is not reachable at the default local address.
 - Requesty uses `https://router.requesty.ai/v1` as the default API base and expects model IDs in `provider/model` format, such as `openai/gpt-4o`.
 
+#### Parallel Search MCP (Server Mode only)
+
+Set these variables in your server deployment:
+
+```bash
+NUXT_PUBLIC_SERVER_MODE=true
+NUXT_PUBLIC_WEB_SEARCH_PROVIDER=parallel
+```
+
+Keep your AI provider configured as usual. Parallel search needs no Parallel account or API key and does not use `NUXT_WEB_SEARCH_API_KEY` or `NUXT_WEB_SEARCH_API_BASE`. Tavily remains the default when no search provider is selected.
+
+This provider uses the free, rate-limited [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) at `https://search.parallel.ai/mcp`. Searches send queries and objectives to Parallel; on-demand page reading sends source URLs. Related calls share a random research session ID. Requests include `deep-research-web-ui/<app version>` as their User-Agent so Parallel can measure aggregate project usage. See Parallel's [Customer Terms](https://parallel.ai/customer-terms) and [Privacy Policy](https://parallel.ai/privacy-policy).
+
+Public Server Mode deployments share one outbound IP, so users share the anonymous free-tier rate limits. Reduce concurrency if requests are rate-limited.
+
+Search excerpts retain their URLs, titles and publication dates. The app can also request full source pages when excerpts are insufficient. News, time, domain and language filters are unsupported and appear through the app's existing limitation notices. The result count is capped locally. Service errors are surfaced without switching providers.
+
+Parallel is available only in Server Mode, including follow-ups. Static deployments and the Client Mode provider picker do not support it because browsers cannot reliably send the project User-Agent. Server requests honor the outbound proxy settings below.
+
 #### Outbound proxy (Server Mode only)
 
 Set `NUXT_PROXY_URL` to route server-side requests through a proxy:
@@ -175,8 +194,8 @@ NUXT_NO_PROXY=localhost,127.0.0.1,::1
 ```
 
 - Supported schemes: `http`, `https`, `socks5`, `socks5h`, `socks`.
-- `http(s)` proxies cover everything: AI providers, Google PSE, you.com, Serply, and the Tavily / Firecrawl / CRW SDKs.
-- `socks*` proxies cover AI providers, Google PSE, you.com and Serply; the Tavily / Firecrawl / CRW SDKs (axios-based) cannot speak SOCKS and will connect directly — use the `http://` endpoint of the same proxy (same credentials on most providers) for full coverage.
+- `http(s)` proxies cover everything: AI providers, Google PSE, you.com, Serply, Parallel, and the Tavily / Firecrawl / CRW SDKs.
+- `socks*` proxies cover AI providers, Google PSE, you.com, Serply and Parallel; the Tavily / Firecrawl / CRW SDKs (axios-based) cannot speak SOCKS and will connect directly. Use the `http://` endpoint of the same proxy (same credentials on most providers) for full coverage.
 - `NUXT_NO_PROXY` accepts `*`, exact hosts and parent domains (`example.com` also matches `api.example.com`). Local AI gateways (Ollama, LiteLLM) and self-hosted scrapers stay direct via the default list.
 - Standard `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` env vars are honored as fallback when `NUXT_PROXY_URL` is unset.
 - Proxy credentials are redacted in logs.
@@ -259,4 +278,3 @@ MIT
 ## Acknowledgements
 
 The project is also hosted on [AtomGit](https://atomgit.com/AnotiaWang/deep-research-web-ui), which is more accessible from mainland China. Thanks to AtomGit for the hosting.
-

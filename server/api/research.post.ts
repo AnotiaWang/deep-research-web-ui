@@ -10,6 +10,7 @@ import type { ConfigAi, ConfigWebSearchProvider } from '~~/shared/types/config'
 import type { RuntimeConfig } from 'nuxt/schema'
 import { researchRequestSchema } from '~~/shared/utils/research-input'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
+import { createParallelWebSearch } from '~~/server/utils/parallel-search'
 import { getApiKeyPool } from '~~/server/utils/api-key-pool'
 
 export default defineEventHandler(async (event) => {
@@ -111,6 +112,7 @@ export default defineEventHandler(async (event) => {
             nodeId,
           })
         }
+        await serverWebSearch.close?.()
         requestAbort.cleanup()
         writer.close()
       }
@@ -125,6 +127,9 @@ export default defineEventHandler(async (event) => {
 
 export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFunction {
   const proxyFetch = getServerProxyFetch(proxyEnvFromRuntimeConfig(runtimeConfig))
+  if (runtimeConfig.public.webSearchProvider === 'parallel') {
+    return createParallelWebSearch({ fetch: proxyFetch })
+  }
   const provider = runtimeConfig.public.webSearchProvider as ConfigWebSearchProvider
   const search: WebSearchFunction = async (query: string, options: WebSearchOptions) => {
     const sharedConfig = {
