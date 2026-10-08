@@ -5,7 +5,7 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js'
+import { CallToolResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import project from '../../public/version.json' with { type: 'json' }
 import { buildSearchFilters, type WebSearchFunction } from '~~/lib/core/web-search'
@@ -138,30 +138,32 @@ export function createParallelWebSearch(config: { fetch?: typeof fetch } = {}): 
     throwIfAborted(callerSignal)
     if (closed) throw new Error('Parallel Search MCP research operation is closed.')
     const current = connect()
+    const timeout = AbortSignal.timeout(timeoutMs)
     const signal = AbortSignal.any([
-      AbortSignal.timeout(timeoutMs),
+      timeout,
       current.abort.signal,
       ...(callerSignal ? [callerSignal] : []),
     ])
+    let result: unknown
     try {
       await abortable(current.ready, signal)
-      return payload(
-        await callSignals.run(signal, () =>
-          current.client.callTool(
-            { name, arguments: { ...args, session_id: sessionId } },
-            undefined,
-            {
-              signal,
-              timeout: timeoutMs,
-            },
-          ),
+      result = await callSignals.run(signal, () =>
+        current.client.callTool(
+          { name, arguments: { ...args, session_id: sessionId } },
+          undefined,
+          {
+            signal,
+            timeout: timeoutMs,
+          },
         ),
       )
     } catch (error) {
       if (signal.aborted) error = signal.reason
-      // A canceled branch must not interrupt other calls sharing the connection.
-      // Service/session failures are retried only by the next explicit tool call.
-      if (!callerSignal?.aborted && connection === current) {
+      // Only transport/session failures poison the shared connection. A canceled or
+      // timed-out call, or a JSON-RPC error for this request, must not interrupt
+      // other calls; service/session failures are retried by the next tool call.
+      const callOnly = callerSignal?.aborted || timeout.aborted || error instanceof McpError
+      if (!callOnly && connection === current) {
         connection = undefined
         await closeConnection(current)
       }
@@ -172,6 +174,8 @@ export function createParallelWebSearch(config: { fetch?: typeof fetch } = {}): 
       }
       throw error
     }
+    // Tool errors and malformed payloads only fail this call.
+    return payload(result)
   }
 
   const search: WebSearchFunction = async (query, options = {}) => {

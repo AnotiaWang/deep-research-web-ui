@@ -451,6 +451,39 @@ it('cancels one in-flight request without canceling its concurrent sibling', asy
   await search.close!()
 })
 
+it('fails only the affected call when a concurrent tool call returns an error', async () => {
+  let release!: () => void
+  const released = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let siblingStarted!: () => void
+  const siblingEntered = new Promise<void>((resolve) => {
+    siblingStarted = resolve
+  })
+  const mock = fixture((request) =>
+    request.params.arguments.search_queries[0] === 'bad'
+      ? { content: [], isError: true }
+      : toolResult({ results: [source] }),
+  )
+  const search = createParallelWebSearch({
+    fetch: async (input, init) => {
+      const rpc = init?.body ? JSON.parse(String(init.body)) : undefined
+      if (rpc?.method === 'tools/call' && rpc.params.arguments.search_queries[0] === 'keep') {
+        siblingStarted()
+        await released
+      }
+      return mock.fetch(input, init)
+    },
+  })
+  const sibling = search('keep', {})
+  await siblingEntered
+  await assert.rejects(() => search('bad', {}), /tool error/)
+  release()
+  assert.equal((await sibling)[0]?.url, source.url)
+  assert.equal(mock.requests.filter(({ rpc }) => rpc.method === 'initialize').length, 1)
+  await search.close!()
+})
+
 it('closes an operation during initialization without issuing a tool request', async () => {
   let started!: () => void
   const entered = new Promise<void>((resolve) => {
