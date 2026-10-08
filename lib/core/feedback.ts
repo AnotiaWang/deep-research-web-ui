@@ -5,7 +5,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema'
 import { feedbackSystemPrompt, languagePrompt } from '~~/lib/prompt'
 import { parseStreamingJson, type DeepPartial } from '~~/shared/utils/json'
 import { throwAiError } from '~~/shared/utils/errors'
-import { getLanguageModel } from '~~/shared/utils/ai-model'
+import { getLanguageModel, getMaxOutputTokens } from '~~/shared/utils/ai-model'
 import { throwIfAborted } from '~~/shared/utils/abort'
 import {
   estimateMaxSearches,
@@ -88,6 +88,7 @@ Pick the cheapest mode that can still answer the query well. Explain it in resea
     model: getLanguageModel(aiConfig),
     system: feedbackSystemPrompt(),
     prompt,
+    maxTokens: getMaxOutputTokens(aiConfig),
     abortSignal: signal,
     onError({ error }) {
       throwAiError('generateFeedback', error)

@@ -1,5 +1,5 @@
 import { skipHydrate } from 'pinia'
-import { getApiBase, isAiApiKeyRequired } from '~~/shared/utils/ai-model'
+import { DEFAULT_AI_CONTEXT_SIZE, getApiBase, isAiApiKeyRequired } from '~~/shared/utils/ai-model'
 import { resolveWebSearchApiBase } from '~~/lib/core/web-search'
 import type { Config } from '~~/shared/types/config'
 
@@ -7,6 +7,7 @@ function validateConfig(config: Config) {
   const ai = config.ai
   if (isAiApiKeyRequired(ai.provider) && !ai.apiKey) return false
   if (typeof ai.contextSize !== 'undefined' && ai.contextSize < 0) return false
+  if (typeof ai.maxOutputTokens !== 'undefined' && ai.maxOutputTokens < 0) return false
 
   const ws = config.webSearch
   if (ws.provider === 'parallel') return false // Parallel requires the server runtime.
@@ -30,6 +31,7 @@ export const useConfigStore = defineStore('config', () => {
     aiProvider: runtimeConfig.public.aiProvider,
     aiModel: runtimeConfig.public.aiModel,
     aiContextSize: runtimeConfig.public.aiContextSize,
+    aiMaxOutputTokens: runtimeConfig.public.aiMaxOutputTokens,
     webSearchProvider: runtimeConfig.public.webSearchProvider,
     webSearchConcurrencyLimit: runtimeConfig.public.webSearchConcurrencyLimit,
     webSearchSearchLanguage: runtimeConfig.public.webSearchSearchLanguage,
@@ -42,7 +44,7 @@ export const useConfigStore = defineStore('config', () => {
     ai: {
       provider: 'openai-compatible',
       model: '',
-      contextSize: 128_000,
+      contextSize: DEFAULT_AI_CONTEXT_SIZE,
     },
     webSearch: {
       provider: 'tavily',
@@ -64,6 +66,7 @@ export const useConfigStore = defineStore('config', () => {
           provider: serverConfig.value.aiProvider as any,
           model: serverConfig.value.aiModel,
           contextSize: serverConfig.value.aiContextSize,
+          maxOutputTokens: serverConfig.value.aiMaxOutputTokens || undefined,
           apiKey: '******',
           apiBase: undefined,
         },

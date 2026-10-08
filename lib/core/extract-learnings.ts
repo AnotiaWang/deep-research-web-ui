@@ -9,6 +9,7 @@ import { throwAiError } from '~~/shared/utils/errors'
 import { searchQueryGuidance, type SearchPlan } from '~~/shared/utils/search-plan'
 import { escapePromptAttribute } from '~~/shared/utils/search-learning'
 import { throwIfAborted } from '~~/shared/utils/abort'
+import { getMaxOutputTokens } from '~~/shared/utils/ai-model'
 
 export type ProcessedSearchResult = z.infer<typeof searchResultTypeSchema>
 export type PartialProcessedSearchResult = DeepPartial<ProcessedSearchResult>
@@ -146,10 +147,12 @@ export function processSearchResult({
       .filter(Boolean)
       .join('\n\n')
 
-  const { prompt, maxTokens } = buildSourcePrompt({
+  const maxTokens = getMaxOutputTokens(aiConfig)
+  const prompt = buildSourcePrompt({
     contents: results.map((item) => item.content),
     query: `${query} ${researchGoal ?? ''}`,
     contextSize: aiConfig.contextSize,
+    maxOutputTokens: maxTokens,
     system: learningExtractorSystemPrompt(),
     render,
   })

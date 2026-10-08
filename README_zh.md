@@ -135,7 +135,8 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 |--------|------|--------|
 | `NUXT_PUBLIC_AI_PROVIDER` | AI 服务商类型 | `openai-compatible` |
 | `NUXT_PUBLIC_AI_MODEL` | AI 模型名称 | `gpt-4o-mini` |
-| `NUXT_PUBLIC_AI_CONTEXT_SIZE` | 上下文大小 | `128000` |
+| `NUXT_PUBLIC_AI_CONTEXT_SIZE` | 上下文大小 | `256000` |
+| `NUXT_PUBLIC_AI_MAX_OUTPUT_TOKENS` | 单次最大输出 token 数（含思考内容），留空由服务商决定 | - |
 | `NUXT_PUBLIC_WEB_SEARCH_PROVIDER` | 搜索服务商 | `tavily` |
 | `NUXT_PUBLIC_WEB_SEARCH_CONCURRENCY_LIMIT` | 最大并发数 | `2` |
 | `NUXT_PUBLIC_WEB_SEARCH_SEARCH_LANGUAGE` | 搜索语言 | `en` |

@@ -3,6 +3,7 @@
   "modelThinking": "思考中...",
   "modelThinkingComplete": "思考完毕",
   "invalidStructuredOutput": "模型返回的内容无效或不完整，无法解析。请尝试换一个更大或者更“聪明”的模型。",
+  "truncatedStructuredOutput": "模型输出达到 token 上限，未能完整返回。推理模型的思考内容也计入该上限，请在设置中调高或清空「最大输出长度」，或调高服务商侧的限制。",
   "index": {
     "projectDescription": "Deep Research 是一个 AI 研究助手：给定一个问题，它会自动规划网络搜索、多轮深入挖掘、对照真实来源核验结论，并生成带引用的研究报告。\nAI 回答支持流式实时反馈，搜索过程会以树状结构可视化展示。\n在客户端模式下，所有 API 请求均直接从浏览器发出，不会存储任何远程数据。",
     "missingConfigTitle": "需要配置 API",
@@ -19,6 +20,8 @@
       "model": "模型名称",
       "contextSize": "上下文长度",
       "contextSizeHelp": "发送给模型的最大 token 数量，不能超过模型本身支持的上下文长度。",
+      "maxOutputTokens": "最大输出长度",
+      "maxOutputTokensHelp": "模型单次最多生成的 token 数，包含思考内容。留空则由服务商决定（推理模型建议留空）。",
       "providers": {
         "openaiCompatible": {
           "title": "OpenAI Compatible",

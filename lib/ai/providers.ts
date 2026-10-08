@@ -2,11 +2,29 @@ import { Tiktoken } from 'js-tiktoken/lite'
 import o200kBase from 'js-tiktoken/ranks/o200k_base'
 
 import { RecursiveCharacterTextSplitter } from '~~/lib/ai/text-splitter'
+import { DEFAULT_AI_CONTEXT_SIZE } from '~~/shared/utils/ai-model'
 
 const MinChunkSize = 140
 const encoder = new Tiktoken(o200kBase)
 
 export const countTokens = (text: string) => encoder.encode(text).length
+
+/**
+ * Prompt tokens available after reserving output and message framing. Reasoning models
+ * spend output tokens on thinking before the answer, so the default reserve is generous;
+ * it only sizes the prompt, and the request carries no cap unless one is configured.
+ * The o200k tokenizer undercounts for many non-OpenAI models, so keep a 10% margin.
+ */
+export function promptTokenBudget(options: {
+  contextSize?: number
+  /** Configured output cap; reserved exactly when set */
+  maxOutputTokens?: number
+  system: string
+}) {
+  const size = options.contextSize || DEFAULT_AI_CONTEXT_SIZE
+  const reservedOutput = options.maxOutputTokens ?? Math.min(32_768, Math.floor(size / 4))
+  return Math.floor((size - reservedOutput - countTokens(options.system) - 128) * 0.9)
+}
 
 // trim prompt to maximum context size
 export function trimPrompt(prompt: string, contextSize?: number) {
@@ -15,7 +33,7 @@ export function trimPrompt(prompt: string, contextSize?: number) {
   }
 
   if (!contextSize) {
-    contextSize = 128_000
+    contextSize = DEFAULT_AI_CONTEXT_SIZE
   }
 
   const length = encoder.encode(prompt).length

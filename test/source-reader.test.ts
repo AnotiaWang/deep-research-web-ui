@@ -137,7 +137,7 @@ describe('source evidence context', () => {
     assert.match(selected, /Quasar pricing is 17 dollars per month/)
     assert.ok(countTokens(selected) <= 120)
     const system = 'Extract original quotes.'
-    const { prompt, maxTokens } = buildSourcePrompt({
+    const prompt = buildSourcePrompt({
       contents: Array(5).fill(content),
       query: 'Quasar pricing',
       system,
@@ -146,7 +146,8 @@ describe('source evidence context', () => {
         `Instructions\n${parts.map((part, i) => `<source id="${i}">${part}</source>`).join('\n')}\nJSON schema`,
     })
     assert.equal((prompt.match(/Quasar pricing is 17/g) ?? []).length, 5)
-    assert.ok(countTokens(prompt) + countTokens(system) + maxTokens + 128 <= 2400)
+    // The default output reserve is a quarter of this small context
+    assert.ok(countTokens(prompt) + countTokens(system) + 600 + 128 <= 2400)
     assert.throws(
       () =>
         buildSourcePrompt({
@@ -158,6 +159,28 @@ describe('source evidence context', () => {
         }),
       /context budget/,
     )
+  })
+
+  it('reserves output for reasoning and a tokenizer margin without capping the request', () => {
+    const content = 'Relevant research evidence sentence.\n'.repeat(2000)
+    const build = (maxOutputTokens?: number) =>
+      countTokens(
+        buildSourcePrompt({
+          contents: [content, content],
+          query: 'research evidence',
+          system: 'system',
+          contextSize: 16_000,
+          maxOutputTokens,
+          render: (parts) => parts.map((part) => `<source>${part}</source>`).join('\n'),
+        }),
+      )
+    // Default reserve: min(32k, a quarter of the context), then a 10% margin
+    const byDefault = build()
+    assert.ok(byDefault <= (16_000 - 4_000) * 0.9 && byDefault > (16_000 - 4_000) * 0.7)
+    // A configured cap is reserved exactly
+    const capped = build(1_000)
+    assert.ok(capped <= (16_000 - 1_000) * 0.9 && capped > byDefault)
+    assert.throws(() => build(16_000), /context budget/)
   })
 })
 

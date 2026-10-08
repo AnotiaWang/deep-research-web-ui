@@ -3,6 +3,7 @@
   "modelThinking": "Thinking...",
   "modelThinkingComplete": "Thinking complete",
   "invalidStructuredOutput": "The model returned content which is incomplete or invalid and cannot be parsed. Try using a bigger or \"smarter\" model.",
+  "truncatedStructuredOutput": "The model hit its output token limit before finishing. Reasoning models count thinking toward this limit; raise or clear \"Max Output Tokens\" in settings, or the provider's limit.",
   "index": {
     "projectDescription": "Deep Research is an AI research agent: give it a question and it plans web searches, digs deeper across multiple rounds, verifies findings against real source pages, and writes a cited report.\nResponses stream in for realtime feedback, and the research process is visualized as a tree.\nIn Client Mode, all API requests are sent directly from your browser and no data is stored remotely.",
     "missingConfigTitle": "Config not set",
@@ -19,6 +20,8 @@
       "model": "Model",
       "contextSize": "Context Length",
       "contextSizeHelp": "The maximum number of tokens that will be sent to the model. Can't be bigger than the model's context length.",
+      "maxOutputTokens": "Max Output Tokens",
+      "maxOutputTokensHelp": "Upper limit on tokens the model may generate, including reasoning. Leave empty to let the provider decide (recommended for reasoning models).",
       "providers": {
         "openaiCompatible": {
           "title": "OpenAI Compatible",

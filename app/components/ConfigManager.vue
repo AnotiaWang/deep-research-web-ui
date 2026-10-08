@@ -217,6 +217,7 @@
       config.value.ai.apiBase = ''
       config.value.ai.model = ''
       config.value.ai.contextSize = undefined
+      config.value.ai.maxOutputTokens = undefined
       aiModelOptions.value = []
       isLoadAiModelsFailed.value = false
     },
@@ -331,8 +332,21 @@
                   v-model="config.ai.contextSize"
                   class="w-26"
                   type="number"
-                  placeholder="128000"
+                  placeholder="256000"
                   :min="512"
+                  :disabled="isServerMode"
+                />
+                tokens
+              </UFormField>
+              <UFormField :label="$t('settings.ai.maxOutputTokens')">
+                <template #help>
+                  {{ $t('settings.ai.maxOutputTokensHelp') }}
+                </template>
+                <UInput
+                  v-model="config.ai.maxOutputTokens"
+                  class="w-26"
+                  type="number"
+                  :min="1"
                   :disabled="isServerMode"
                 />
                 tokens

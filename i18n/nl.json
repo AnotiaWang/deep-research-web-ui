@@ -3,6 +3,7 @@
   "modelThinking": "Nadenken...",
   "modelThinkingComplete": "Nadenken klaar",
   "invalidStructuredOutput": "Het model heeft content geretourneerd die onvolledig of ongeldig is en niet kan worden verwerkt. Probeer een groter of \"slimmer\" model te gebruiken.",
+  "truncatedStructuredOutput": "Het model bereikte de limiet voor uitvoertokens voordat het klaar was. Redeneermodellen tellen het denkproces mee; verhoog of wis \"Max. uitvoertokens\" in de instellingen, of de limiet van de provider.",
   "index": {
     "projectDescription": "Deep Research is een AI-onderzoeksassistent: geef een vraag op en de AI plant webzoekopdrachten, graaft in meerdere rondes dieper, verifieert bevindingen aan de hand van echte bronpagina's en schrijft een rapport met bronvermeldingen.\nAI-reacties worden gestreamd voor realtime feedback, en het onderzoeksproces wordt gevisualiseerd met een boomdiagram.\nIn de clientmodus worden alle API-aanvragen rechtstreeks vanuit uw browser verzonden en worden er geen gegevens extern opgeslagen.",
     "missingConfigTitle": "Configuratie niet compleet",
@@ -19,6 +20,8 @@
       "model": "Model",
       "contextSize": "Contextlengte",
       "contextSizeHelp": "Het maximale aantal tokens dat naar het model wordt verzonden. Kan niet groter zijn dan de contextlengte van het model.",
+      "maxOutputTokens": "Max. uitvoertokens",
+      "maxOutputTokensHelp": "Maximaal aantal tokens dat het model mag genereren, inclusief redeneren. Laat leeg om de provider te laten beslissen (aanbevolen voor redeneermodellen).",
       "providers": {
         "openaiCompatible": {
           "title": "OpenAI-compatible",

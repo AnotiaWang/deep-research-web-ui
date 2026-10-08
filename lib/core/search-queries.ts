@@ -2,9 +2,10 @@ import { streamText } from 'ai'
 import { z } from 'zod'
 import zodToJsonSchema from 'zod-to-json-schema'
 import type { ConfigWebSearchProvider } from '~~/shared/types/config'
-import { parseStreamingJson, type DeepPartial } from '~~/shared/utils/json'
+import { parseStreamingJson, structuredOutputError, type DeepPartial } from '~~/shared/utils/json'
 import { languagePrompt, resolveResponseLanguage, searchPlannerSystemPrompt } from '~~/lib/prompt'
 import { throwAiError } from '~~/shared/utils/errors'
+import { getMaxOutputTokens } from '~~/shared/utils/ai-model'
 import {
   searchPlanSchema,
   searchPlanningRules,
@@ -91,6 +92,7 @@ export function generateSearchQueries({
     model: getLanguageModel(aiConfig),
     system: searchPlannerSystemPrompt(),
     prompt,
+    maxTokens: getMaxOutputTokens(aiConfig),
     abortSignal: signal,
     onError({ error }) {
       throwAiError('generateSearchQueries', error)
@@ -119,7 +121,7 @@ export async function generateFallbackSearchPlan({
     if (chunk.type === 'object' && chunk.value.queries?.[0]) {
       fallback = chunk.value.queries[0]
     } else if (chunk.type === 'error' || chunk.type === 'bad-end') {
-      throw new Error(chunk.type === 'error' ? chunk.message : 'Invalid structured output')
+      throw new Error(chunk.type === 'error' ? chunk.message : structuredOutputError(chunk))
     } else if (chunk.type === 'reasoning') {
       onReasoning(chunk.delta)
     }

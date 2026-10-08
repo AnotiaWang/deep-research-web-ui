@@ -3,6 +3,7 @@
   "modelThinking": "생각 중...",
   "modelThinkingComplete": "생각 완료",
   "invalidStructuredOutput": "모델이 반환한 내용이 불완전하거나 유효하지 않아 파싱할 수 없습니다. 더 크거나 \"똑똑한\" 모델을 사용해 보세요.",
+  "truncatedStructuredOutput": "모델이 출력 토큰 한도에 도달하여 응답을 완료하지 못했습니다. 추론 모델은 사고 과정도 이 한도에 포함됩니다. 설정에서 \"최대 출력 토큰\"을 늘리거나 비우거나, 제공자 측 한도를 늘려 주세요.",
   "index": {
     "projectDescription": "Deep Research는 AI 리서치 에이전트입니다. 질문을 입력하면 웹 검색을 계획하고, 여러 라운드에 걸쳐 더 깊이 파고들며, 실제 출처 페이지와 대조하여 결론을 검증한 뒤 인용이 포함된 보고서를 작성합니다.\nAI 응답은 실시간 피드백을 위해 스트리밍되며, 연구 과정은 트리 구조로 시각화됩니다.\n클라이언트 모드에서는 모든 API 요청이 브라우저에서 직접 전송되며 원격 서버에 데이터가 저장되지 않습니다.",
     "missingConfigTitle": "설정이 되어 있지 않습니다",
@@ -19,6 +20,8 @@
       "model": "모델",
       "contextSize": "컨텍스트 길이",
       "contextSizeHelp": "모델에 전송되는 최대 토큰 수입니다. 모델의 컨텍스트 길이보다 클 수 없습니다.",
+      "maxOutputTokens": "최대 출력 토큰",
+      "maxOutputTokensHelp": "모델이 생성할 수 있는 최대 토큰 수(추론 포함)입니다. 비워 두면 제공자가 결정합니다(추론 모델에 권장).",
       "providers": {
         "openaiCompatible": {
           "title": "OpenAI 호환",

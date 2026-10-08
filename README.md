@@ -137,7 +137,8 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 |----------|-------------|---------|
 | `NUXT_PUBLIC_AI_PROVIDER` | AI provider type | `openai-compatible` |
 | `NUXT_PUBLIC_AI_MODEL` | AI model name | `gpt-4o-mini` |
-| `NUXT_PUBLIC_AI_CONTEXT_SIZE` | Context size | `128000` |
+| `NUXT_PUBLIC_AI_CONTEXT_SIZE` | Context size | `256000` |
+| `NUXT_PUBLIC_AI_MAX_OUTPUT_TOKENS` | Max output tokens per call, including reasoning. Unset lets the provider decide | - |
 | `NUXT_PUBLIC_WEB_SEARCH_PROVIDER` | Search provider | `tavily` |
 | `NUXT_PUBLIC_WEB_SEARCH_CONCURRENCY_LIMIT` | Max concurrency | `2` |
 | `NUXT_PUBLIC_WEB_SEARCH_SEARCH_LANGUAGE` | Search language | `en` |

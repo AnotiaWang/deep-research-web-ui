@@ -8,13 +8,7 @@ function positiveInteger(value: string | undefined, fallback: number) {
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: [
-    '@pinia/nuxt',
-    '@nuxt/ui',
-    '@nuxtjs/color-mode',
-    '@vueuse/nuxt',
-    '@nuxtjs/i18n',
-  ],
+  modules: ['@pinia/nuxt', '@nuxt/ui', '@nuxtjs/color-mode', '@vueuse/nuxt', '@nuxtjs/i18n'],
 
   runtimeConfig: {
     public: {
@@ -23,9 +17,13 @@ export default defineNuxtConfig({
       // Server mode configuration - exposed to frontend
       aiProvider: process.env.NUXT_PUBLIC_AI_PROVIDER || 'openai-compatible',
       aiModel: process.env.NUXT_PUBLIC_AI_MODEL || 'gpt-4o-mini',
-      aiContextSize: parseInt(process.env.NUXT_PUBLIC_AI_CONTEXT_SIZE || '128000'),
+      aiContextSize: parseInt(process.env.NUXT_PUBLIC_AI_CONTEXT_SIZE || '256000'),
+      // 0 = unset: the provider decides the output limit
+      aiMaxOutputTokens: positiveInteger(process.env.NUXT_PUBLIC_AI_MAX_OUTPUT_TOKENS, 0),
       webSearchProvider: process.env.NUXT_PUBLIC_WEB_SEARCH_PROVIDER || 'tavily',
-      webSearchConcurrencyLimit: parseInt(process.env.NUXT_PUBLIC_WEB_SEARCH_CONCURRENCY_LIMIT || '2'),
+      webSearchConcurrencyLimit: parseInt(
+        process.env.NUXT_PUBLIC_WEB_SEARCH_CONCURRENCY_LIMIT || '2',
+      ),
       webSearchSearchLanguage: process.env.NUXT_PUBLIC_WEB_SEARCH_SEARCH_LANGUAGE || 'en',
       tavilyAdvancedSearch: process.env.NUXT_PUBLIC_TAVILY_ADVANCED_SEARCH === 'true',
       tavilySearchTopic: process.env.NUXT_PUBLIC_TAVILY_SEARCH_TOPIC || 'general',
