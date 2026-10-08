@@ -42,10 +42,14 @@ export type WebSearchConfig = {
   tavilySearchTopic?: 'general' | 'news' | 'finance'
   /**
    * Custom fetch implementation (server-only). Used to route Google PSE /
-   * you.com / Serply requests through an outbound proxy. Tavily/Firecrawl SDKs
+   * you.com / Serply / looot requests through an outbound proxy. Tavily/Firecrawl SDKs
    * (axios-based) pick up `HTTP(S)_PROXY` env instead. Never set in the browser.
    */
   fetch?: typeof fetch
+  /** looot only: total time to wait for a run to finish before giving up. Default 60 s. */
+  pollDeadlineMs?: number
+  /** looot only: delay between run status polls. Default 1.5 s. */
+  pollIntervalMs?: number
 }
 
 const FIRECRAWL_DEFAULT_API_BASE = 'https://api.firecrawl.dev'
@@ -53,6 +57,10 @@ const CRW_DEFAULT_API_BASE = 'https://fastcrw.com/api'
 const YOUCOM_KEYLESS_SEARCH_URL = 'https://api.you.com/v1/agents/search'
 const YOUCOM_KEYED_SEARCH_URL = 'https://ydc-index.io/v1/search'
 const SERPLY_SEARCH_URL = 'https://api.serply.io/v1/search'
+const LOOOT_API_BASE = 'https://api.looot.ai'
+/** Serper accepts at most 100 results per request. */
+const LOOOT_MAX_RESULTS = 100
+const LOOOT_TERMINAL_STATUSES = ['completed', 'failed', 'blocked', 'stopped']
 
 /** Single item from the You.com search API `results.web` / `results.news` arrays. */
 interface YoucomSearchResult {
@@ -75,6 +83,23 @@ interface SerplySearchResult {
     /** Present on news results, e.g. `2 days ago`. */
     published_time?: string
   }
+}
+
+/** Run object returned by looot `POST /v1/runs` and `GET /v1/runs/{id}`. */
+interface LoootRun {
+  runId?: string
+  status?: string
+  result?: { organic?: LoootOrganicResult[] }
+  error?: { code?: string; message?: string }
+}
+
+/** Single item from Serper's `organic` array, returned as the run result. */
+interface LoootOrganicResult {
+  title?: string
+  link?: string
+  snippet?: string
+  /** Present on some results, e.g. `2 days ago`. */
+  date?: string
 }
 
 export function resolveWebSearchApiBase(
@@ -151,6 +176,24 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
       serply,
       // Explicit publication-date windows (cdr) are not applied reliably.
       limitations: hasDates ? ['time' as const] : [],
+    }
+  }
+  if (provider === 'looot') {
+    // looot runs Serper (Google web search), so Google's `tbs` and `hl` apply.
+    // Domains are handled by the adapter with a `site:` clause in the query.
+    const looot: Record<string, string> = {}
+    if (tbs && !hasDates) looot.tbs = tbs
+    if (options.lang) looot.hl = options.lang === 'zh' ? 'zh-cn' : options.lang
+    return {
+      google: {},
+      firecrawl: {},
+      tavily: {},
+      looot,
+      limitations: [
+        // The web endpoint has no news vertical, and cdr date windows are not applied reliably.
+        ...(options.intent === 'news' ? ['news' as const] : []),
+        ...(hasDates ? ['time' as const] : []),
+      ],
     }
   }
   if (provider === 'youcom' || provider === 'parallel')
@@ -462,6 +505,95 @@ async function searchWithSerply(
   }
 }
 
+function loootError(run: LoootRun, fallback: string) {
+  return new Error(run.error?.message || fallback)
+}
+
+async function searchWithLooot(
+  config: WebSearchConfig,
+  query: string,
+  options: WebSearchOptions,
+): Promise<WebSearchResult[]> {
+  const apiKey = config.apiKey
+  if (!apiKey) {
+    throw new Error('looot API key not set')
+  }
+
+  // Ref: https://docs.looot.ai (POST /v1/runs, endpoint `serper-search`)
+  const maxResults = options.maxResults ?? 5
+  const domains = options.includeDomains ?? []
+  const siteClause = domains.map((d) => `site:${d}`).join(' OR ')
+  const q = siteClause ? `${query} ${domains.length > 1 ? `(${siteClause})` : siteClause}` : query
+  const input = {
+    q,
+    num: Math.min(Math.max(maxResults, 1), LOOOT_MAX_RESULTS),
+    ...(buildSearchFilters('looot', options).looot ?? {}),
+  }
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  }
+  const doFetch = config.fetch ?? fetch
+  const readRun = async (response: Response): Promise<LoootRun> => {
+    // Error bodies from the edge may not be JSON.
+    const run = (await response.json().catch(() => ({}))) as LoootRun
+    if (!response.ok) throw loootError(run, `HTTP ${response.status}`)
+    return run
+  }
+
+  try {
+    const deadline = Date.now() + (config.pollDeadlineMs ?? 60_000)
+    const interval = config.pollIntervalMs ?? 1500
+    // The key makes a retried POST return the same run instead of billing twice.
+    const idempotencyKey = `drwu-${globalThis.crypto.randomUUID()}`
+    let run = await readRun(
+      await doFetch(`${LOOOT_API_BASE}/v1/runs?wait=30`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ endpointId: 'serper-search', input, idempotencyKey }),
+        signal: options.signal,
+      }),
+    )
+    // Past the wait window the run may still be going; poll it, never re-post it.
+    while (!LOOOT_TERMINAL_STATUSES.includes(run.status ?? '')) {
+      if (!run.runId || Date.now() + interval > deadline) {
+        throw new Error(
+          `run ${run.runId ?? 'unknown'} did not finish in time (status ${run.status})`,
+        )
+      }
+      await abortable(new Promise((resolve) => setTimeout(resolve, interval)), options.signal)
+      run = await readRun(
+        await doFetch(`${LOOOT_API_BASE}/v1/runs/${encodeURIComponent(run.runId)}`, {
+          headers,
+          signal: options.signal,
+        }),
+      )
+    }
+    if (run.status !== 'completed') throw loootError(run, `run ${run.status}`)
+
+    return (run.result?.organic ?? [])
+      .flatMap((r): WebSearchResult[] => {
+        if (!r.link || !r.snippet) return []
+        return [
+          {
+            content: r.snippet,
+            sourceType: 'search-result' as const,
+            url: r.link,
+            ...(r.title ? { title: r.title } : {}),
+            ...(r.date ? { publishedAt: r.date } : {}),
+          },
+        ]
+      })
+      .slice(0, maxResults)
+  } catch (error: unknown) {
+    if (options.signal?.aborted || isAbortError(error)) throw error
+    console.error('looot search failed:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`looot Error: ${message}`)
+  }
+}
+
 /** Run a single web search with the given provider config. */
 export async function searchWeb(
   config: WebSearchConfig,
@@ -483,6 +615,8 @@ export async function searchWeb(
       throw new Error('Parallel Search MCP requires Server Mode (NUXT_PUBLIC_SERVER_MODE=true).')
     case 'serply':
       return searchWithSerply(config, query, options)
+    case 'looot':
+      return searchWithLooot(config, query, options)
     case 'tavily':
     default:
       return searchWithTavily(config, query, options)

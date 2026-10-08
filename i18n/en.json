@@ -73,6 +73,9 @@
         },
         "serply": {
           "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
+        },
+        "looot": {
+          "help": "Web search via looot (Google results through Serper, pay per call, about $0.001 per search). Requires an API key; get one at {0}."
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",

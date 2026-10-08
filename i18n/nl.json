@@ -69,6 +69,9 @@
         },
         "serply": {
           "help": "Zoeken op het web via de Serply API (Google-resultaten). Vereist een API-sleutel; vraag er een aan op {0}."
+        },
+        "looot": {
+          "help": "Zoeken op het web via looot (Google-resultaten via Serper, betalen per aanroep, ongeveer $0,001 per zoekopdracht). Vereist een API-sleutel; vraag er een aan op {0}."
         }
       },
       "concurrencyLimitHelp": "Beperk de gelijktijdige zoektaken. Dit is handig om te voorkomen dat de zoekmachine overbelast raakt en verzoeken mislukken.",

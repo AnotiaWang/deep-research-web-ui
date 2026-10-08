@@ -13,6 +13,7 @@ function validateConfig(config: Config) {
   if (ws.provider === 'parallel') return false // Parallel requires the server runtime.
   if (ws.provider === 'tavily' && !ws.apiKey) return false
   if (ws.provider === 'serply' && !ws.apiKey) return false
+  if (ws.provider === 'looot' && !ws.apiKey) return false
   // Either apiBase or apiKey is required for firecrawl
   if (ws.provider === 'firecrawl' && !ws.apiBase && !ws.apiKey) return false
   // Either apiBase (self-host) or apiKey (cloud) is required for crw
