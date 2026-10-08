@@ -557,3 +557,172 @@ describe('serply provider', () => {
     }
   })
 })
+
+describe('looot provider', () => {
+  const runBody = (organic: unknown[], status = 'completed') => ({
+    runId: 'run_1',
+    status,
+    result: { organic },
+    actualCost: 0.001,
+  })
+
+  it('maps time and language to Serper params, flags explicit dates and news', () => {
+    const filters = buildSearchFilters('looot', {
+      intent: 'news',
+      timeRange: 'week',
+      includeDomains: ['example.com'],
+      lang: 'zh',
+    })
+    assert.deepEqual(filters.looot, { tbs: 'qdr:w', hl: 'zh-cn' })
+    assert.deepEqual(filters.limitations, ['news'])
+    const dated = buildSearchFilters('looot', { startDate: '2024-01-01', endDate: '2024-02-01' })
+    assert.deepEqual(dated.looot, {})
+    assert.deepEqual(dated.limitations, ['time'])
+  })
+
+  it('posts a Serper run with bearer auth, idempotency key, site clause and clamped num', async () => {
+    const calls: { url: URL; init: any }[] = []
+    const fakeFetch = (async (input: any, init?: any) => {
+      calls.push({ url: new URL(String(input)), init })
+      return Response.json(
+        runBody([
+          { title: 'A', link: 'https://example.com/a', snippet: 'Snippet A', date: '2 days ago' },
+          { title: 'B', link: 'https://example.com/b', snippet: 'Snippet B' },
+        ]),
+      )
+    }) as typeof fetch
+    const results = await searchWeb(
+      { provider: 'looot', apiKey: 'test-only', fetch: fakeFetch },
+      'nuxt',
+      { includeDomains: ['nuxt.com', 'github.com'], maxResults: 500, timeRange: 'month', lang: 'de' },
+    )
+    assert.equal(calls.length, 1)
+    const { url, init } = calls[0]!
+    assert.equal(url.origin + url.pathname, 'https://api.looot.ai/v1/runs')
+    assert.equal(url.searchParams.get('wait'), '30')
+    assert.equal(init.method, 'POST')
+    assert.equal(new Headers(init.headers).get('Authorization'), 'Bearer test-only')
+    assert.equal(new Headers(init.headers).get('Content-Type'), 'application/json')
+    const body = JSON.parse(init.body)
+    assert.equal(body.endpointId, 'serper-search')
+    assert.ok(typeof body.idempotencyKey === 'string' && body.idempotencyKey.length >= 8)
+    assert.deepEqual(body.input, {
+      q: 'nuxt (site:nuxt.com OR site:github.com)',
+      num: 100,
+      tbs: 'qdr:m',
+      hl: 'de',
+    })
+    assert.deepEqual(results[0], {
+      content: 'Snippet A',
+      sourceType: 'search-result',
+      url: 'https://example.com/a',
+      title: 'A',
+      publishedAt: '2 days ago',
+    })
+    assert.equal('publishedAt' in results[1]!, false)
+  })
+
+  it('uses a unique idempotency key per search and trims to maxResults', async () => {
+    const keys: string[] = []
+    const fakeFetch = (async (_input: any, init?: any) => {
+      const body = JSON.parse(init.body)
+      keys.push(body.idempotencyKey)
+      assert.equal(body.input.num, 3)
+      return Response.json(
+        runBody(
+          Array.from({ length: 5 }, (_, i) => ({
+            link: `https://example.com/${i}`,
+            snippet: `s${i}`,
+          })),
+        ),
+      )
+    }) as typeof fetch
+    const config = { provider: 'looot' as const, apiKey: 'k', fetch: fakeFetch }
+    const first = await searchWeb(config, 'q', { maxResults: 3 })
+    await searchWeb(config, 'q', { maxResults: 3 })
+    assert.equal(first.length, 3)
+    assert.equal(new Set(keys).size, 2)
+  })
+
+  it('requires a key and drops items without link or snippet', async () => {
+    await assert.rejects(() => searchWeb({ provider: 'looot' }, 'query'), /looot API key not set/)
+    const fakeFetch = (async () =>
+      Response.json(
+        runBody([
+          { title: 'No link', snippet: 'orphan' },
+          { link: 'https://example.com/empty', title: 'No text' },
+        ]),
+      )) as typeof fetch
+    assert.deepEqual(await searchWeb({ provider: 'looot', apiKey: 'k', fetch: fakeFetch }, 'q'), [])
+  })
+
+  it('throws error.message for failed, blocked and stopped runs and HTTP errors', async () => {
+    for (const status of ['failed', 'blocked', 'stopped']) {
+      const fakeFetch = (async () =>
+        Response.json({
+          runId: 'r',
+          status,
+          error: { code: 'x', message: `run ${status} because reasons` },
+        })) as typeof fetch
+      await assert.rejects(
+        () => searchWeb({ provider: 'looot', apiKey: 'k', fetch: fakeFetch }, 'q'),
+        new RegExp(`looot Error: run ${status} because reasons`),
+      )
+    }
+    const unauthorized = (async () =>
+      Response.json(
+        { error: { code: 'unauthorized', message: 'Invalid token' } },
+        { status: 401 },
+      )) as typeof fetch
+    await assert.rejects(
+      () => searchWeb({ provider: 'looot', apiKey: 'k', fetch: unauthorized }, 'q'),
+      /looot Error: Invalid token/,
+    )
+    const bad = (async () => new Response('Bad gateway', { status: 502 })) as typeof fetch
+    await assert.rejects(
+      () => searchWeb({ provider: 'looot', apiKey: 'k', fetch: bad }, 'q'),
+      /looot Error: HTTP 502/,
+    )
+  })
+
+  it('polls GET /v1/runs/{id} until the run is terminal', async () => {
+    const seen: string[] = []
+    const statuses = ['running', 'completed']
+    const fakeFetch = (async (input: any, init?: any) => {
+      const url = new URL(String(input))
+      seen.push(`${init?.method ?? 'GET'} ${url.pathname}`)
+      assert.equal(new Headers(init.headers).get('Authorization'), 'Bearer k')
+      if (init?.method === 'POST') return Response.json({ runId: 'run_9', status: 'queued' })
+      const status = statuses.shift()!
+      return Response.json(
+        status === 'completed'
+          ? runBody([{ link: 'https://example.com/p', snippet: 'polled' }])
+          : { runId: 'run_9', status },
+      )
+    }) as typeof fetch
+    const results = await searchWeb(
+      { provider: 'looot', apiKey: 'k', fetch: fakeFetch },
+      'q',
+      {},
+    )
+    assert.deepEqual(seen, ['POST /v1/runs', 'GET /v1/runs/run_9', 'GET /v1/runs/run_9'])
+    assert.equal(results[0]?.content, 'polled')
+  })
+
+  it('gives up polling at the deadline and does not retry the paid run', async () => {
+    let posts = 0
+    const fakeFetch = (async (_input: any, init?: any) => {
+      if (init?.method === 'POST') posts++
+      return Response.json({ runId: 'run_slow', status: 'running' })
+    }) as typeof fetch
+    await assert.rejects(
+      () =>
+        searchWeb(
+          { provider: 'looot', apiKey: 'k', fetch: fakeFetch, pollDeadlineMs: 50, pollIntervalMs: 10 },
+          'q',
+        ),
+      /looot Error: run run_slow did not finish/,
+    )
+    assert.equal(posts, 1)
+  })
+})

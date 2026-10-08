@@ -109,3 +109,36 @@ it('rotates configured Serply keys and stops once every key is disabled', async 
     rmSync(cacheRoot, { recursive: true, force: true })
   }
 })
+
+it('rotates configured looot keys and stops once every key is disabled', async () => {
+  const previous = globalThis.fetch
+  const previousCwd = process.cwd()
+  const cacheRoot = mkdtempSync(path.join(tmpdir(), 'looot-keypool-test-'))
+  const keys: (string | null)[] = []
+  let fail = false
+  globalThis.fetch = async (input, init) => {
+    assert.equal(new URL(String(input)).hostname, 'api.looot.ai')
+    keys.push(new Headers(init?.headers).get('Authorization'))
+    return fail
+      ? Response.json({ error: { code: 'unauthorized', message: 'Invalid token' } }, { status: 401 })
+      : Response.json({ runId: 'r', status: 'completed', result: { organic: [] } })
+  }
+  process.chdir(cacheRoot)
+  try {
+    const search = createServerWebSearch(config('test-key-one, test-key-two', 'looot'))
+    await search('Nuxt', {})
+    await search('Nuxt', {})
+    assert.deepEqual(keys, ['Bearer test-key-one', 'Bearer test-key-two'])
+    fail = true
+    for (let index = 0; index < 10; index++) {
+      await assert.rejects(() => search('Nuxt', {}), /Invalid token/)
+    }
+    const requestCount = keys.length
+    await assert.rejects(() => search('Nuxt', {}), /No active looot API keys available/)
+    assert.equal(keys.length, requestCount)
+  } finally {
+    globalThis.fetch = previous
+    process.chdir(previousCwd)
+    rmSync(cacheRoot, { recursive: true, force: true })
+  }
+})

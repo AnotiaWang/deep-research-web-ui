@@ -149,6 +149,14 @@
       _help: t('settings.webSearch.providers.serply.help'),
       link: 'https://serply.io',
     },
+    {
+      label: 'looot',
+      value: 'looot',
+      help: 'settings.webSearch.providers.looot.help',
+      // Only kept for easy reference in i18n Ally
+      _help: t('settings.webSearch.providers.looot.help'),
+      link: 'https://looot.ai',
+    },
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
   const selectedAiProvider = computed(() =>
