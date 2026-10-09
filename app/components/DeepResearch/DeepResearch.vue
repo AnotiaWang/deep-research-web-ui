@@ -402,6 +402,11 @@
 
     try {
       const result = await startResearch(options, nodeCurrentData)
+      // Cancelled or timed out: drop the partial retry so the node keeps its retry action.
+      if (!options.isCurrent()) {
+        restoreResearchGraph(graphSnapshot)
+        return
+      }
       const hadEvidence = graphSnapshot.nodes.some(
         (item) => (item.id === nodeId || isChildNode(nodeId, item.id)) && item.learnings?.length,
       )
