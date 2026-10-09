@@ -17,6 +17,7 @@
   import { createFlowNode } from '~/utils/research-graph'
   import {
     createResearchHistoryGraph,
+    projectFlowFromHistoryNodes,
     restoreResearchHistoryGraph,
   } from '~/utils/research-history-graph'
   import { abortable } from '~~/shared/utils/abort'
@@ -260,17 +261,15 @@
     nodes: DeepResearchNode[]
     selectedNodeId: string | undefined
     searchResults: Record<string, PartialProcessedSearchResult>
-    flowNodes: SearchNode[]
-    flowEdges: SearchEdge[]
   }
 
   function snapshotResearchGraph(): ResearchGraphSnapshot {
+    // Flow nodes/edges are derived from `nodes` and are not cloned: Vue Flow writes its
+    // reactive GraphNode objects back through v-model, which structuredClone rejects.
     return structuredClone({
       nodes: toRaw(nodes.value),
       selectedNodeId: selectedNodeId.value,
       searchResults: toRaw(searchResults.value),
-      flowNodes: toRaw(flowNodes.value),
-      flowEdges: toRaw(flowEdges.value),
     })
   }
 
@@ -278,8 +277,9 @@
     nodes.value = snapshot.nodes
     selectedNodeId.value = snapshot.selectedNodeId
     searchResults.value = snapshot.searchResults
-    flowNodes.value = snapshot.flowNodes
-    flowEdges.value = snapshot.flowEdges
+    const projected = projectFlowFromHistoryNodes(snapshot.nodes)
+    flowNodes.value = projected.flowNodes
+    flowEdges.value = projected.flowEdges
     nextTick(() => flowRef.value?.reset())
   }
 
