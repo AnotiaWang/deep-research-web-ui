@@ -236,6 +236,7 @@
     "noFeedback": "피드백 생성 결과 질문이 없습니다.",
     "noLearnings": "연구가 완료되었지만 학습 내용이 없습니다.",
     "noReport": "보고서 생성 결과 내용이 없습니다.",
+    "retryFailed": "재시도 실패",
     "timeoutMessage": "작업이 제한 시간을 초과했습니다. 지금 다시 시도할 수 있습니다."
   },
   "common": {

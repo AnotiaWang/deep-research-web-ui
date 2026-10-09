@@ -88,6 +88,7 @@
 
   const runtimeConfig = useRuntimeConfig()
   const { t } = useI18n()
+  const toast = useToast()
   const version = runtimeConfig.public.version
   const isServerMode = runtimeConfig.public.serverMode
 
@@ -309,6 +310,15 @@
       if (isTimeoutError(error)) {
         timeoutOperation(lease, 'research', t('researchSession.timeoutMessage'))
       } else {
+        // Retry failures keep the previous session state, so surface the error explicitly.
+        if (isCurrentOperation(lease.sessionId, lease.operationId)) {
+          console.error('Research retry failed:', error)
+          toast.add({
+            title: t('researchSession.retryFailed'),
+            description: error instanceof Error ? error.message : String(error),
+            color: 'error',
+          })
+        }
         failResearchRetry(lease)
       }
     } finally {

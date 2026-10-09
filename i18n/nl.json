@@ -232,6 +232,7 @@
     "noFeedback": "De modelfeedback bevatte geen vragen.",
     "noLearnings": "Het onderzoek is zonder resultaten voltooid.",
     "noReport": "Het rapport bevatte geen inhoud.",
+    "retryFailed": "Opnieuw proberen mislukt",
     "timeoutMessage": "De bewerking heeft de tijdslimiet overschreden. Je kunt het nu opnieuw proberen."
   },
   "common": {
