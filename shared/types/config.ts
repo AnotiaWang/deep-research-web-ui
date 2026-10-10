@@ -4,6 +4,7 @@ export type ConfigAiProvider =
   | '302-ai'
   | 'openrouter'
   | 'requesty'
+  | 'atlascloud'
   | 'deepseek'
   | 'ollama'
   | 'litellm'

@@ -12,6 +12,7 @@ const AI_PROVIDERS: Record<ConfigAiProvider, true> = {
   '302-ai': true,
   openrouter: true,
   requesty: true,
+  atlascloud: true,
   deepseek: true,
   ollama: true,
   litellm: true,
@@ -95,6 +96,9 @@ export function getApiBase(config: ConfigAi) {
   }
   if (config.provider === 'requesty') {
     return config.apiBase || 'https://router.requesty.ai/v1'
+  }
+  if (config.provider === 'atlascloud') {
+    return config.apiBase || 'https://api.atlascloud.ai/v1'
   }
   if (config.provider === 'deepseek') {
     return config.apiBase || 'https://api.deepseek.com/v1'

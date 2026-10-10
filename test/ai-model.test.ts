@@ -13,6 +13,16 @@ describe('getApiBase', () => {
     )
   })
 
+  it('returns the default Atlas Cloud URL', () => {
+    assert.equal(
+      getApiBase({
+        provider: 'atlascloud',
+        model: 'deepseek-ai/deepseek-v4-flash',
+      }),
+      'https://api.atlascloud.ai/v1',
+    )
+  })
+
   it('returns the default LiteLLM proxy URL', () => {
     assert.equal(
       getApiBase({
@@ -45,6 +55,7 @@ describe('isAiApiKeyRequired', () => {
     assert.equal(isAiApiKeyRequired('openai-compatible'), true)
     assert.equal(isAiApiKeyRequired('openrouter'), true)
     assert.equal(isAiApiKeyRequired('requesty'), true)
+    assert.equal(isAiApiKeyRequired('atlascloud'), true)
     assert.equal(isAiApiKeyRequired('deepseek'), true)
   })
 })

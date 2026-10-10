@@ -77,6 +77,12 @@
       value: 'requesty',
     },
     {
+      label: 'Atlas Cloud',
+      value: 'atlascloud',
+      link: 'https://console.atlascloud.ai/api-keys',
+      linkText: 'console.atlascloud.ai',
+    },
+    {
       label: 'Ollama',
       value: 'ollama',
     },
