@@ -150,7 +150,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 
 | Type | Supported values |
 |------|------------------|
-| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
+| AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `atlascloud`, `deepseek`, `ollama`, `litellm` |
 | Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel` (Server Mode only) |
 
 Notes:
@@ -165,6 +165,7 @@ Notes:
 - Ollama uses `http://localhost:11434/v1` as the default API base. When running the app inside Docker, `localhost` refers to the container itself, so set `NUXT_AI_API_BASE` to a reachable host or Docker network address if Ollama runs outside the container.
 - LiteLLM uses `http://localhost:4000/v1` as the default API base. Its API key is optional when the proxy does not require authentication; set `NUXT_AI_API_BASE` when the proxy is not reachable at the default local address.
 - Requesty uses `https://router.requesty.ai/v1` as the default API base and expects model IDs in `provider/model` format, such as `openai/gpt-4o`.
+- Atlas Cloud uses `https://api.atlascloud.ai/v1` as the default API base and expects vendor-prefixed model IDs, such as `deepseek-ai/deepseek-v4-flash` or `zai-org/glm-5.2`.
 
 #### Parallel Search MCP (Server Mode only)
 
