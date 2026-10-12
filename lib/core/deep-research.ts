@@ -3,7 +3,7 @@ import { assessSearchLearnings, type SearchAssessment } from '~~/shared/utils/se
 import { deduplicateLearnings } from '~~/shared/utils/research-learning'
 import pLimit from 'p-limit'
 import { z } from 'zod'
-import { parseStreamingJson } from '~~/shared/utils/json'
+import { parseStreamingJson, structuredOutputError } from '~~/shared/utils/json'
 import type { ResearchLearning } from '~~/shared/types/research-session'
 import {
   searchPlanSchema,
@@ -206,7 +206,7 @@ export async function deepResearch({
         } else if (chunk.type === 'bad-end') {
           progress({
             type: 'error',
-            message: 'Invalid structured output',
+            message: structuredOutputError(chunk),
             nodeId,
           })
           break
@@ -348,7 +348,7 @@ export async function deepResearch({
                   } else if (chunk.type === 'error') {
                     throw new Error(chunk.message)
                   } else if (chunk.type === 'bad-end') {
-                    throw new Error('Invalid structured output')
+                    throw new Error(structuredOutputError(chunk))
                   }
                 }
 

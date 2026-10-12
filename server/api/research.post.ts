@@ -46,6 +46,7 @@ export default defineEventHandler(async (event) => {
     apiBase: runtimeConfig.aiApiBase,
     model: runtimeConfig.public.aiModel,
     contextSize: runtimeConfig.public.aiContextSize,
+    maxOutputTokens: runtimeConfig.public.aiMaxOutputTokens || undefined,
     fetch: getServerProxyFetch(proxyEnvFromRuntimeConfig(runtimeConfig)),
   }
 

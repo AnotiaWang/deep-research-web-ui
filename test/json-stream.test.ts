@@ -2,12 +2,20 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { z } from 'zod'
 import type { TextStreamPart } from 'ai'
-import { parseStreamingJson } from '../shared/utils/json.ts'
+import { parseStreamingJson, structuredOutputError } from '../shared/utils/json.ts'
 
 async function* streamText(parts: string[]): AsyncGenerator<TextStreamPart<any>> {
   for (const text of parts) {
     yield { type: 'text-delta', textDelta: text } as TextStreamPart<any>
   }
+}
+
+async function* finishedStream(
+  parts: TextStreamPart<any>[],
+  finishReason: string,
+): AsyncGenerator<TextStreamPart<any>> {
+  yield* parts
+  yield { type: 'finish', finishReason } as TextStreamPart<any>
 }
 
 describe('parseStreamingJson', () => {
@@ -135,5 +143,55 @@ describe('parseStreamingJson', () => {
     assert.equal((await events.next()).value?.type, 'object')
     await events.return()
     assert.equal(closed, true)
+  })
+
+  it('reports truncation when reasoning exhausts the output limit before any content', async () => {
+    const events = await Array.fromAsync(
+      parseStreamingJson(
+        finishedStream([{ type: 'reasoning', textDelta: 'Thinking...' }], 'length'),
+        schema,
+        (value) => Array.isArray(value.questions),
+      ),
+    )
+
+    assert.deepEqual(events, [
+      { type: 'reasoning', delta: 'Thinking...' },
+      { type: 'bad-end', rawText: '', finishReason: 'length' },
+    ])
+    assert.match(structuredOutputError(events[1] as { finishReason?: string }), /truncated/)
+  })
+
+  it('rejects truncated JSON even when the repaired prefix looks valid', async (t) => {
+    t.mock.method(performance, 'now', () => 0)
+    const events = await Array.fromAsync(
+      parseStreamingJson(
+        finishedStream([{ type: 'text-delta', textDelta: '{"questions":["cut off' }], 'length'),
+        schema,
+        (value) => Array.isArray(value.questions),
+      ),
+    )
+
+    assert.deepEqual(events.at(-1), {
+      type: 'bad-end',
+      rawText: '{"questions":["cut off',
+      finishReason: 'length',
+    })
+  })
+
+  it('accepts valid JSON that finished normally', async () => {
+    const events = await Array.fromAsync(
+      parseStreamingJson(
+        finishedStream([{ type: 'text-delta', textDelta: '{"questions":["a"]}' }], 'stop'),
+        schema,
+        (value) => Array.isArray(value.questions),
+      ),
+    )
+
+    assert.deepEqual(events, [{ type: 'object', value: { questions: ['a'] } }])
+  })
+
+  it('keeps the generic message for invalid output that was not truncated', () => {
+    assert.equal(structuredOutputError({ finishReason: 'stop' }), 'Invalid structured output')
+    assert.equal(structuredOutputError({}), 'Invalid structured output')
   })
 })

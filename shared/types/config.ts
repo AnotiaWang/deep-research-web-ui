@@ -18,6 +18,11 @@ export interface ConfigAi {
   model: string
   contextSize?: number
   /**
+   * Hard cap on generated tokens, including reasoning. Unset leaves the limit to the provider,
+   * since reasoning models can spend any fixed budget on thinking alone.
+   */
+  maxOutputTokens?: number
+  /**
    * Custom fetch implementation (server-only). Used to route AI provider
    * requests through an outbound proxy. Never set in the browser.
    */
@@ -49,6 +54,7 @@ export interface ServerRuntimeConfig {
   aiProvider: ConfigAiProvider
   aiModel: string
   aiContextSize: number
+  aiMaxOutputTokens: number
   aiApiKey: string
   aiApiBase?: string
   webSearchProvider: ConfigWebSearchProvider
@@ -66,6 +72,7 @@ export interface PublicRuntimeConfig {
   aiProvider: ConfigAiProvider
   aiModel: string
   aiContextSize: number
+  aiMaxOutputTokens: number
   webSearchProvider: ConfigWebSearchProvider
   webSearchConcurrencyLimit: number
   webSearchSearchLanguage: string

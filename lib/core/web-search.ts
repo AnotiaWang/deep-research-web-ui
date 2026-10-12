@@ -102,6 +102,11 @@ interface LoootOrganicResult {
   date?: string
 }
 
+/** Keeps the HTTP status so the server key pool can tell key failures from outages. */
+function httpError(message: string, status: number) {
+  return Object.assign(new Error(message), { status })
+}
+
 export function resolveWebSearchApiBase(
   provider: ConfigWebSearchProvider,
   apiBase?: string,
@@ -306,13 +311,14 @@ async function searchWithGooglePse(
   try {
     const doFetch = config.fetch ?? fetch
     const response = await doFetch(apiUrl, { signal: options.signal })
-    const data = (await response.json()) as {
+    // Error bodies from the edge may not be JSON.
+    const data = (await response.json().catch(() => ({}))) as {
       items?: Array<{ title: string; link: string; snippet: string }>
       error?: { message?: string }
     }
 
     if (!response.ok) {
-      throw new Error(data.error?.message || `HTTP ${response.status}`)
+      throw httpError(data.error?.message || `HTTP ${response.status}`, response.status)
     }
 
     if (!data.items) {
@@ -329,7 +335,7 @@ async function searchWithGooglePse(
     if (options.signal?.aborted || isAbortError(error)) throw error
     console.error('Google PSE search failed:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`Google PSE Error: ${message}`)
+    throw new Error(`Google PSE Error: ${message}`, { cause: error })
   }
 }
 
@@ -404,7 +410,10 @@ async function searchWithYoucom(
       } catch {
         // Body is not JSON; keep the status-only message.
       }
-      throw new Error(`You.com search failed (${usingKey ? 'keyed' : 'keyless'}): ${message}`)
+      throw httpError(
+        `You.com search failed (${usingKey ? 'keyed' : 'keyless'}): ${message}`,
+        response.status,
+      )
     }
 
     const data = (await response.json()) as {
@@ -433,7 +442,7 @@ async function searchWithYoucom(
     if (options.signal?.aborted || isAbortError(error)) throw error
     console.error('You.com search failed:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`You.com Error: ${message}`)
+    throw new Error(`You.com Error: ${message}`, { cause: error })
   }
 }
 
@@ -480,7 +489,7 @@ async function searchWithSerply(
     }
 
     if (!response.ok) {
-      throw new Error(data.detail || `HTTP ${response.status}`)
+      throw httpError(data.detail || `HTTP ${response.status}`, response.status)
     }
 
     return (data.results ?? [])
@@ -501,7 +510,7 @@ async function searchWithSerply(
     if (options.signal?.aborted || isAbortError(error)) throw error
     console.error('Serply search failed:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`Serply Error: ${message}`)
+    throw new Error(`Serply Error: ${message}`, { cause: error })
   }
 }
 
@@ -538,7 +547,9 @@ async function searchWithLooot(
   const readRun = async (response: Response): Promise<LoootRun> => {
     // Error bodies from the edge may not be JSON.
     const run = (await response.json().catch(() => ({}))) as LoootRun
-    if (!response.ok) throw loootError(run, `HTTP ${response.status}`)
+    if (!response.ok) {
+      throw httpError(run.error?.message || `HTTP ${response.status}`, response.status)
+    }
     return run
   }
 
@@ -590,7 +601,7 @@ async function searchWithLooot(
     if (options.signal?.aborted || isAbortError(error)) throw error
     console.error('looot search failed:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`looot Error: ${message}`)
+    throw new Error(`looot Error: ${message}`, { cause: error })
   }
 }
 

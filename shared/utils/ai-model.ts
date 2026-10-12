@@ -39,6 +39,15 @@ export function isAiApiKeyRequired(provider: ConfigAiProvider) {
   return provider !== 'ollama' && provider !== 'litellm'
 }
 
+export const DEFAULT_AI_CONTEXT_SIZE = 256_000
+
+/** The configured output cap, or `undefined` so the request omits `max_tokens`. */
+export function getMaxOutputTokens(config: ConfigAi) {
+  // Form inputs may store numbers as strings
+  const value = Number(config.maxOutputTokens)
+  return Number.isInteger(value) && value > 0 ? value : undefined
+}
+
 export function getLanguageModel(config: ConfigAi) {
   const apiBase = getApiBase(config)
   let model: LanguageModelV1

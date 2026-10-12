@@ -1,4 +1,4 @@
-import { countTokens } from '~~/lib/ai/providers'
+import { countTokens, promptTokenBudget } from '~~/lib/ai/providers'
 
 const omitted = '\n[... source text omitted ...]\n'
 
@@ -53,13 +53,13 @@ export function buildSourcePrompt(options: {
   contents: string[]
   query: string
   contextSize?: number
+  /** Configured output cap; reserved exactly when set */
+  maxOutputTokens?: number
   system: string
   render: (contents: string[]) => string
 }) {
-  const size = options.contextSize || 128_000
-  const maxTokens = Math.min(4096, Math.floor(size / 4))
-  // Reserve output and message framing, and account for ALL instructions/metadata first.
-  const limit = size - maxTokens - countTokens(options.system) - 128
+  // Account for ALL instructions/metadata first.
+  const limit = promptTokenBudget(options)
   const overhead = countTokens(options.render(options.contents.map(() => '')))
   if (overhead >= limit) throw new Error('Research instructions exceed the model context budget.')
   let perSource = Math.floor((limit - overhead) / Math.max(1, options.contents.length))
@@ -68,8 +68,8 @@ export function buildSourcePrompt(options: {
     prompt = options.render(
       options.contents.map((content) => selectSourcePassages(content, options.query, perSource)),
     )
-    if (countTokens(prompt) <= limit) return { prompt, maxTokens }
+    if (countTokens(prompt) <= limit) return prompt
     perSource = Math.floor(perSource * 0.8)
   } while (perSource > 0)
-  return { prompt: options.render(options.contents.map(() => '')), maxTokens }
+  return options.render(options.contents.map(() => ''))
 }

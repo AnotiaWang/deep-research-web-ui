@@ -12,8 +12,25 @@ export type ParseStreamingJsonEvent<T> =
   | { type: 'object'; value: DeepPartial<T> }
   | { type: 'reasoning'; delta: string }
   | { type: 'error'; message: string }
-  /** The call finished with invalid content that can't be parsed as JSON */
-  | { type: 'bad-end'; rawText: string }
+  /**
+   * The call finished without complete, valid JSON. `finishReason` is `length` when the
+   * output limit cut it off, which reasoning models can hit before writing any content.
+   */
+  | { type: 'bad-end'; rawText: string; finishReason?: string }
+
+/** User-facing message for a `bad-end` event */
+export function structuredOutputError(event: { finishReason?: string }) {
+  return event.finishReason === 'length'
+    ? 'Model output was truncated at the output token limit before valid JSON was produced. Reasoning models count thinking toward this limit; raise or unset the max output tokens setting.'
+    : 'Invalid structured output'
+}
+
+/** Keep logs useful without dumping a whole response */
+function excerpt(text: string, size = 500) {
+  return text.length <= size * 2
+    ? text
+    : `${text.slice(0, size)}\n[... ${text.length - size * 2} chars omitted ...]\n${text.slice(-size)}`
+}
 
 export function removeJsonMarkdown(text: string) {
   text = text.trim()
@@ -42,6 +59,8 @@ export async function* parseStreamingJson<T extends z.ZodType>(
   isValid: (value: DeepPartial<z.infer<T>>) => boolean,
 ): AsyncGenerator<ParseStreamingJsonEvent<z.infer<T>>> {
   let rawText = ''
+  let reasoningLength = 0
+  let finishReason: string | undefined
   let hasValidObject = false
   let parsedLength = 0
   let lastParsedAt = -Infinity
@@ -60,7 +79,12 @@ export async function* parseStreamingJson<T extends z.ZodType>(
   }
 
   for await (const chunk of fullStream) {
+    if (chunk.type === 'finish') {
+      finishReason = chunk.finishReason
+      continue
+    }
     if (chunk.type === 'reasoning') {
+      reasoningLength += chunk.textDelta.length
       yield { type: 'reasoning', delta: chunk.textDelta }
       continue
     }
@@ -87,12 +111,14 @@ export async function* parseStreamingJson<T extends z.ZodType>(
   if (finalEvent) yield finalEvent
 
   // Fail when JSON never became valid — including successful parses like `{}`
-  // that do not satisfy the caller's isValid predicate.
-  if (!hasValidObject) {
-    console.warn(`[parseStreamingJson] Failed to parse JSON: ${removeJsonMarkdown(rawText)}`)
-    yield {
-      type: 'bad-end',
-      rawText,
-    }
+  // that do not satisfy the caller's isValid predicate. Truncated output also fails:
+  // partial JSON can be repaired into a valid-looking but incomplete object.
+  if (!hasValidObject || finishReason === 'length') {
+    console.warn(
+      `[parseStreamingJson] Failed to parse JSON (finishReason: ${finishReason ?? 'unknown'}, ` +
+        `content: ${rawText.length} chars, reasoning: ${reasoningLength} chars): ` +
+        excerpt(removeJsonMarkdown(rawText)),
+    )
+    yield { type: 'bad-end', rawText, finishReason }
   }
 }

@@ -7,16 +7,56 @@ interface ApiKeyState {
   key: string
   active: boolean
   errorCount: number
+  /** Epoch ms after which a disabled key is probed again. */
+  disabledUntil: number
 }
 
 /** On-disk shape: keys are identified by fingerprint, never stored in plaintext. */
 interface PersistedPoolState {
   currentIndex: number
-  keys: Array<{ fingerprint: string; active: boolean; errorCount: number }>
+  keys: Array<{ fingerprint: string; active: boolean; errorCount: number; disabledUntil?: number }>
 }
 
 const MAX_ERRORS = 5
 const PERSIST_DELAY_MS = 1000
+/** Disabled keys are retried after this cooldown instead of staying disabled forever. */
+export const KEY_COOLDOWN_MS = 10 * 60 * 1000
+
+const NETWORK_ERROR_CODES = new Set([
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'EPIPE',
+  'ETIMEDOUT',
+  'ERR_NETWORK',
+])
+
+/** Network failures, timeouts and upstream 5xx say nothing about the key itself. */
+export function isTransientError(error: unknown) {
+  let current = error
+  for (let depth = 0; current && typeof current === 'object' && depth < 5; depth++) {
+    const value = current as {
+      status?: unknown
+      statusCode?: unknown
+      code?: unknown
+      response?: { status?: unknown }
+      cause?: unknown
+    }
+    const status = value.response?.status ?? value.status ?? value.statusCode
+    if (typeof status === 'number') return status === 408 || status >= 500
+    if (current instanceof TypeError) return true
+    if (
+      typeof value.code === 'string' &&
+      (NETWORK_ERROR_CODES.has(value.code) || value.code.startsWith('UND_ERR_'))
+    ) {
+      return true
+    }
+    current = value.cause
+  }
+  return false
+}
 
 function fingerprint(key: string) {
   return createHash('sha256').update(key).digest('hex').slice(0, 16)
@@ -28,11 +68,18 @@ export class ApiKeyPool {
   private readonly cacheFilePath: string
   private readonly providerName: string
   private persistTimer: ReturnType<typeof setTimeout> | undefined
+  private readonly now: () => number
 
-  constructor(keys: string[], providerName: string, cacheDir = path.join(process.cwd(), '.cache')) {
+  constructor(
+    keys: string[],
+    providerName: string,
+    cacheDir = path.join(process.cwd(), '.cache'),
+    now: () => number = Date.now,
+  ) {
     this.providerName = providerName
+    this.now = now
     this.cacheFilePath = path.join(cacheDir, `keypool_${providerName}.json`)
-    this.keys = keys.map((key) => ({ key, active: true, errorCount: 0 }))
+    this.keys = keys.map((key) => ({ key, active: true, errorCount: 0, disabledUntil: 0 }))
     this.restore()
   }
 
@@ -63,6 +110,8 @@ export class ApiKeyPool {
       const entry = byFingerprint.get(fingerprint(state.key))!
       state.active = entry.active !== false
       state.errorCount = Number.isInteger(entry.errorCount) ? entry.errorCount : 0
+      // Files written before cooldowns existed have no expiry: probe those keys again.
+      state.disabledUntil = Number.isFinite(entry.disabledUntil) ? entry.disabledUntil! : 0
     }
     this.currentIndex = Number.isInteger(saved.currentIndex) ? saved.currentIndex : 0
   }
@@ -87,10 +136,11 @@ export class ApiKeyPool {
   private async persist() {
     const state: PersistedPoolState = {
       currentIndex: this.currentIndex,
-      keys: this.keys.map(({ key, active, errorCount }) => ({
+      keys: this.keys.map(({ key, active, errorCount, disabledUntil }) => ({
         fingerprint: fingerprint(key),
         active,
         errorCount,
+        disabledUntil,
       })),
     }
     try {
@@ -101,7 +151,21 @@ export class ApiKeyPool {
     }
   }
 
+  /** Re-enables keys whose cooldown expired; one more failure disables them again. */
+  private reviveCooledDownKeys() {
+    const now = this.now()
+    for (const state of this.keys) {
+      if (state.active || state.disabledUntil > now) continue
+      state.active = true
+      state.errorCount = MAX_ERRORS - 1
+      console.info(
+        `[ApiKeyPool] Retrying ${this.providerName} key ${fingerprint(state.key)} after cooldown.`,
+      )
+    }
+  }
+
   getNextKey(): string | null {
+    this.reviveCooledDownKeys()
     const activeKeys = this.keys.filter((k) => k.active)
     if (activeKeys.length === 0) return null
     if (this.currentIndex >= activeKeys.length) this.currentIndex = 0
@@ -117,8 +181,9 @@ export class ApiKeyPool {
     state.errorCount++
     if (state.errorCount >= MAX_ERRORS && state.active) {
       state.active = false
+      state.disabledUntil = this.now() + KEY_COOLDOWN_MS
       console.error(
-        `[ApiKeyPool] Disabling ${this.providerName} key ${fingerprint(key)} after repeated errors.`,
+        `[ApiKeyPool] Disabling ${this.providerName} key ${fingerprint(key)} for ${KEY_COOLDOWN_MS / 60_000} minutes after repeated errors.`,
       )
     }
     this.schedulePersist()
@@ -133,7 +198,8 @@ export class ApiKeyPool {
 
   /**
    * Runs `request` with the next active key and records the outcome.
-   * Aborts never count against a key; `isKeyError` narrows which failures do.
+   * Aborts and transient failures never count against a key by default;
+   * `isKeyError` overrides which failures do.
    */
   async withKey<T>(
     request: (key: string) => Promise<T>,
@@ -151,7 +217,7 @@ export class ApiKeyPool {
       return result
     } catch (error) {
       if (options.signal?.aborted || isAbortError(error)) throw error
-      if (options.isKeyError?.(error) ?? true) this.markKeyError(key)
+      if (options.isKeyError?.(error) ?? !isTransientError(error)) this.markKeyError(key)
       throw error
     }
   }

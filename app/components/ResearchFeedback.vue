@@ -120,7 +120,11 @@
           researchMode = chunk.value?.researchMode
           researchModeReason = chunk.value?.researchModeReason
         } else if (chunk.type === 'bad-end') {
-          error.value = t('invalidStructuredOutput')
+          error.value = t(
+            chunk.finishReason === 'length'
+              ? 'truncatedStructuredOutput'
+              : 'invalidStructuredOutput',
+          )
         }
       }
       if (!isCurrent()) return
