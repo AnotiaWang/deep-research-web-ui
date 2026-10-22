@@ -219,7 +219,7 @@ docker run -p 3000:3000 \
   -e NUXT_AI_API_KEY=your-ai-api-key \
   -e NUXT_WEB_SEARCH_API_KEY=your-search-api-key \
   -e NUXT_PROXY_URL="$NUXT_PROXY_URL" \
-  anotia/deep-research-web-ui:latest
+  anotia/deep-research-web:latest
 ```
 
 Get credentials from your [Helodata](https://helodata.com?ref=deepresearchwebui2) dashboard. See [Helodata docs](https://docs.helodata.com/) for region / city / sticky-session username format. For proxy behavior details, see [Outbound proxy (Server Mode only)](#outbound-proxy-server-mode-only).

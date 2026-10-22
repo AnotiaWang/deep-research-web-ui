@@ -217,7 +217,7 @@ docker run -p 3000:3000 \
   -e NUXT_AI_API_KEY=你的AI-API密钥 \
   -e NUXT_WEB_SEARCH_API_KEY=你的搜索API密钥 \
   -e NUXT_PROXY_URL="$NUXT_PROXY_URL" \
-  anotia/deep-research-web-ui:latest
+  anotia/deep-research-web:latest
 ```
 
 凭证请到 [Helodata](https://helodata.com?ref=deepresearchwebui2) 控制台获取。地区、城市和粘性会话的用户名格式见 [Helodata 文档](https://docs.helodata.com/)。代理行为细节见 [出站代理（仅服务端模式）](#出站代理仅服务端模式)。
