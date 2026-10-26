@@ -5,8 +5,11 @@ import { z } from 'zod'
 import { researchLearningSchema } from '~~/shared/utils/research-learning'
 import { reportRevisionSchema } from '~~/shared/utils/report-revision'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
+import { assertAccessAuthorized } from '~~/server/utils/access'
 
 export default defineEventHandler(async (event) => {
+  // This route spends the server's AI key, so it does not rely on the path-based middleware alone
+  assertAccessAuthorized(event)
   const runtimeConfig = useRuntimeConfig()
   const body = await readBody(event)
 

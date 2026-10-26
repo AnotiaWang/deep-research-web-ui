@@ -12,8 +12,12 @@ import { researchRequestSchema } from '~~/shared/utils/research-input'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
 import { createParallelWebSearch } from '~~/server/utils/parallel-search'
 import { getApiKeyPool } from '~~/server/utils/api-key-pool'
+import { assertAccessAuthorized } from '~~/server/utils/access'
 
 export default defineEventHandler(async (event) => {
+  // This route spends the server's AI and search keys, so it does not rely on the path-based
+  // middleware alone
+  assertAccessAuthorized(event)
   const runtimeConfig = useRuntimeConfig()
   const parsedBody = researchRequestSchema.safeParse(await readBody(event))
   if (!parsedBody.success) {

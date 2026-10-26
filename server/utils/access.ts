@@ -26,3 +26,16 @@ export function getAccessStatus(event: H3Event): AccessStatus {
     authorized: isAccessPasswordValid(getHeader(event, ACCESS_PASSWORD_HEADER), expected),
   }
 }
+
+/**
+ * Throws unless the caller presented the access password (or none is configured).
+ *
+ * Every route that spends server-side credentials calls this itself, so a mismatch between the
+ * middleware's idea of the path and the router's cannot leave a handler unguarded.
+ */
+export function assertAccessAuthorized(event: H3Event) {
+  const status = getAccessStatus(event)
+  if (status.required && !status.authorized) {
+    throw createError({ statusCode: 401, statusMessage: 'Access password required' })
+  }
+}

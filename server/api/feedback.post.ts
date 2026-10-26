@@ -2,8 +2,11 @@ import { generateFeedback } from '~~/lib/core/feedback'
 import type { ConfigAi } from '~~/shared/types/config'
 import { feedbackRequestSchema } from '~~/shared/utils/research-input'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
+import { assertAccessAuthorized } from '~~/server/utils/access'
 
 export default defineEventHandler(async (event) => {
+  // This route spends the server's AI key, so it does not rely on the path-based middleware alone
+  assertAccessAuthorized(event)
   const runtimeConfig = useRuntimeConfig()
   const parsedBody = feedbackRequestSchema.safeParse(await readBody(event))
   if (!parsedBody.success) {
