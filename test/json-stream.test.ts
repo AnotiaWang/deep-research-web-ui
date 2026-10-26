@@ -109,6 +109,25 @@ describe('parseStreamingJson', () => {
     await events.return()
   })
 
+  it('does not forward an upstream API error body to the client', async () => {
+    // The SSE handlers stream this message verbatim, and providers echo the rejected key.
+    async function* chunks(): AsyncGenerator<TextStreamPart<any>> {
+      yield {
+        type: 'error',
+        error: Object.assign(new Error('Incorrect API key provided: Bearer sk-live-SECRET'), {
+          url: 'http://gateway.internal/v1/chat/completions',
+          statusCode: 401,
+          responseBody: '{"error":"Bearer sk-live-SECRET"}',
+        }),
+      } as TextStreamPart<any>
+      assert.fail('The consumer stops at the error')
+    }
+    const events = parseStreamingJson(chunks(), schema, () => true)
+    const event = (await events.next()).value as { type: string; message: string }
+    assert.equal(event.message, 'The AI provider rejected the request (HTTP 401).')
+    await events.return()
+  })
+
   it('propagates upstream cancellation without flushing buffered text', async (t) => {
     t.mock.method(performance, 'now', () => 0)
     const abort = new DOMException('Cancelled', 'AbortError')

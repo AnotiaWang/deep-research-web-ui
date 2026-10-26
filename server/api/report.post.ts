@@ -3,23 +3,29 @@ import type { ConfigAi } from '~~/shared/types/config'
 import { getStreamErrorMessage } from '~~/shared/utils/stream-error'
 import { z } from 'zod'
 import { researchLearningSchema } from '~~/shared/utils/research-learning'
+import { researchInputLimits, researchRequestLimits } from '~~/shared/utils/research-input'
 import { reportRevisionSchema } from '~~/shared/utils/report-revision'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
 import { assertAccessAuthorized } from '~~/server/utils/access'
+import { REQUEST_BODY_LIMITS, readApiBody } from '~~/server/utils/request-body'
 
 export default defineEventHandler(async (event) => {
   // This route spends the server's AI key, so it does not rely on the path-based middleware alone
   assertAccessAuthorized(event)
   const runtimeConfig = useRuntimeConfig()
-  const body = await readBody(event)
+
+  const body = await readApiBody(event, REQUEST_BODY_LIMITS['/api/report'])
 
   const parsed = z
     .object({
-      prompt: z.string().min(1),
-      learnings: z.array(researchLearningSchema).min(1),
-      language: z.string().min(1),
+      // Bounded: every learning is tokenized synchronously before the report call starts.
+      prompt: z.string().min(1).max(researchRequestLimits.originalQuery),
+      // 500 is well past what the research flow accumulates; the byte cap above is the real limit.
+      learnings: z.array(researchLearningSchema).min(1).max(researchInputLimits.learnings),
+      language: z.string().min(1).max(researchRequestLimits.language),
       revision: reportRevisionSchema.optional(),
     })
+    .strict()
     .safeParse(body)
   if (!parsed.success) {
     throw createError({

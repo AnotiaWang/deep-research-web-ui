@@ -1,6 +1,7 @@
 import { parsePartialJson } from '@ai-sdk/ui-utils'
 import type { TextStreamPart } from 'ai'
 import { z } from 'zod'
+import { getStreamErrorMessage } from '~~/shared/utils/stream-error'
 
 export type DeepPartial<T> = T extends object
   ? T extends Array<any>
@@ -89,9 +90,11 @@ export async function* parseStreamingJson<T extends z.ZodType>(
       continue
     }
     if (chunk.type === 'error') {
+      // This message reaches the browser through the SSE handlers. AI SDK errors carry the
+      // provider's response body and URL, which often quote the rejected key.
       yield {
         type: 'error',
-        message: chunk.error instanceof Error ? chunk.error.message : String(chunk.error),
+        message: getStreamErrorMessage({ error: chunk.error }),
       }
       continue
     }

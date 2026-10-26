@@ -1,4 +1,4 @@
-import { searchConstraintsSchema } from '~~/shared/utils/search-plan'
+import { searchConstraintsSchema, searchPlanSchema } from '~~/shared/utils/search-plan'
 import { z } from 'zod'
 import { isReadableUrl } from '~~/shared/utils/source-url'
 import { researchLearningSchema } from '~~/shared/utils/research-learning'
@@ -7,6 +7,12 @@ export const researchInputLimits = {
   numQuestions: { min: 1, max: 5 },
   depth: { min: 1, max: 8 },
   breadth: { min: 1, max: 8 },
+  /**
+   * Accumulated findings replayed into a retry. The client sends every ancestor node's learnings,
+   * and the server tokenizes them synchronously before the request starts, so this bounds both
+   * the prompt and the event-loop cost. Each entry is itself capped by `researchLearningLimits`.
+   */
+  learnings: 500,
 } as const
 
 export const researchPresets = {
@@ -54,7 +60,19 @@ export function estimateMaxSearches(breadth: number, depth: number) {
   return total
 }
 
-const requiredText = z.string().trim().min(1)
+/**
+ * Ceilings for caller-supplied text. Every value here is later interpolated into a prompt that the
+ * server pays for, and `query`/`originalQuery` are re-sent on each recursive branch, so an
+ * unbounded string would be multiplied by the whole research tree.
+ */
+export const researchRequestLimits = {
+  query: 4_000,
+  originalQuery: 8_000,
+  language: 64,
+  nodeId: 128,
+} as const
+
+const boundedText = (max: number) => z.string().trim().min(1).max(max)
 const SUPPORTED_LOCALES = ['en', 'zh', 'nl', 'ko'] as const
 
 /**
@@ -77,7 +95,7 @@ const boundedInteger = (min: number, max: number) =>
   )
 
 export const researchInputSchema = z.object({
-  query: requiredText,
+  query: boundedText(researchRequestLimits.query),
   numQuestions: boundedInteger(
     researchInputLimits.numQuestions.min,
     researchInputLimits.numQuestions.max,
@@ -88,8 +106,12 @@ export const researchInputSchema = z.object({
 
 export const feedbackRequestSchema = researchInputSchema
   .pick({ query: true, numQuestions: true })
-  .extend({ language: requiredText, suggestResearchMode: z.boolean().optional() })
-  .passthrough()
+  .extend({
+    language: boundedText(researchRequestLimits.language),
+    suggestResearchMode: z.boolean().optional(),
+  })
+  // Strict: passthrough let an unknown key ride along into the handler for no benefit.
+  .strict()
 
 export const researchRequestSchema = researchInputSchema
   .pick({ query: true, breadth: true, depth: true })
@@ -99,15 +121,25 @@ export const researchRequestSchema = researchInputSchema
     searchConstraints: searchConstraintsSchema.optional(),
     sourceUrls: z.array(z.string().max(4096).refine(isReadableUrl)).max(2).optional(),
     /** Root user goal preserved when retrying or recursing with a narrowed query */
-    originalQuery: z.string().trim().min(1).optional(),
-    learnings: z.array(researchLearningSchema).default([]),
+    originalQuery: boundedText(researchRequestLimits.originalQuery).optional(),
+    learnings: z.array(researchLearningSchema).max(researchInputLimits.learnings).default([]),
     currentDepth: boundedInteger(
       researchInputLimits.depth.min,
       researchInputLimits.depth.max,
     ).default(1),
-    nodeId: z.string().default('0'),
-    retryNode: z.unknown().optional(),
+    nodeId: z.string().max(researchRequestLimits.nodeId).default('0'),
+    // Only `id`, `label`, `researchGoal` and `searchPlan` are read downstream; anything else was
+    // forwarded untouched from an untrusted body into the recursive search path.
+    retryNode: z
+      .object({
+        id: z.string().max(researchRequestLimits.nodeId),
+        label: z.string().max(researchRequestLimits.query),
+        researchGoal: z.string().max(researchRequestLimits.query).optional(),
+        searchPlan: searchPlanSchema.partial().optional(),
+      })
+      .strict()
+      .optional(),
   })
-  .passthrough()
+  .strict()
 
 export type ValidatedResearchInput = z.infer<typeof researchInputSchema>

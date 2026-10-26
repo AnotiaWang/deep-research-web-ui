@@ -6,4 +6,9 @@ export interface AccessStatus {
   required: boolean
   /** Whether the request carried the correct password (always true when not required) */
   authorized: boolean
+  /** Whether this deployment serves API routes at all (always present from `/api/access`) */
+  serverMode?: boolean
 }
+
+/** Why a request may not spend server-side credentials. */
+export type AccessRejection = 'server-mode-disabled' | 'password-required' | 'cross-site-request'

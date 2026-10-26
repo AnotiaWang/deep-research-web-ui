@@ -42,9 +42,11 @@ export function useServerMode() {
       body: JSON.stringify(body),
       signal,
     })
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       await response.body?.cancel().catch(() => {})
-      access.promptOpen.value = true
+      // A 403 is a refusal this visitor cannot fix by entering a password (server mode off, or a
+      // cross-site request), so prompting would only loop.
+      if (response.status === 401) access.promptOpen.value = true
       throw new AccessDeniedError(t('accessPassword.denied'))
     }
     return parseServerOperationStream(response)

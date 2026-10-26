@@ -4,8 +4,10 @@ import {
   estimateMaxSearches,
   feedbackRequestSchema,
   findResearchPreset,
+  researchInputLimits,
   researchPresets,
   researchInputSchema,
+  researchRequestLimits,
   researchRequestSchema,
 } from '../shared/utils/research-input.ts'
 
@@ -154,5 +156,68 @@ describe('research presets', () => {
     for (const preset of Object.values(researchPresets)) {
       assert.equal(researchInputSchema.safeParse({ ...validInput, ...preset }).success, true)
     }
+  })
+})
+
+/**
+ * The server tokenizes every caller-supplied string synchronously before a request starts, so an
+ * unbounded field is a denial-of-service vector, not just a large prompt: a 42 MiB `report` body
+ * once blocked the event loop for 23 seconds.
+ */
+describe('request size bounds', () => {
+  const base = { query: 'topic', breadth: 2, depth: 2, languageCode: 'en' }
+
+  it('rejects oversized query text', () => {
+    const tooLong = 'q'.repeat(researchRequestLimits.query + 1)
+    assert.equal(researchRequestSchema.safeParse({ ...base, query: tooLong }).success, false)
+    assert.equal(
+      feedbackRequestSchema.safeParse({ query: tooLong, language: 'en', numQuestions: 3 }).success,
+      false,
+    )
+  })
+
+  it('rejects an oversized learning and more learnings than the cap', () => {
+    const one = { url: 'https://e.com', learning: 'x' }
+    const oversized = { ...base, learnings: [{ ...one, learning: 'x'.repeat(20_001) }] }
+    assert.equal(researchRequestSchema.safeParse(oversized).success, false)
+
+    const many = {
+      ...base,
+      learnings: Array.from({ length: researchInputLimits.learnings + 1 }, () => one),
+    }
+    assert.equal(researchRequestSchema.safeParse(many).success, false)
+    assert.equal(
+      researchRequestSchema.safeParse({ ...base, learnings: [one] }).success,
+      true,
+      'a normal payload still passes',
+    )
+  })
+
+  it('rejects unknown keys instead of forwarding them to the handler', () => {
+    assert.equal(
+      researchRequestSchema.safeParse({ ...base, unexpected: 'value' }).success,
+      false,
+      'research body',
+    )
+    assert.equal(
+      feedbackRequestSchema.safeParse({ query: 'q', language: 'en', numQuestions: 3, extra: 1 })
+        .success,
+      false,
+      'feedback body',
+    )
+  })
+
+  it('accepts only the retryNode fields the research flow reads', () => {
+    const retryNode = { id: '0-1', label: 'follow-up query' }
+    assert.equal(researchRequestSchema.safeParse({ ...base, retryNode }).success, true)
+    assert.equal(
+      researchRequestSchema.safeParse({ ...base, retryNode: { ...retryNode, injected: 'x' } })
+        .success,
+      false,
+    )
+    assert.equal(
+      researchRequestSchema.safeParse({ ...base, retryNode: { label: 'missing id' } }).success,
+      false,
+    )
   })
 })

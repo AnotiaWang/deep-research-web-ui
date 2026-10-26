@@ -1,14 +1,17 @@
 import { generateFeedback } from '~~/lib/core/feedback'
 import type { ConfigAi } from '~~/shared/types/config'
 import { feedbackRequestSchema } from '~~/shared/utils/research-input'
+import { toClientErrorMessage } from '~~/shared/utils/redact'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
 import { assertAccessAuthorized } from '~~/server/utils/access'
+import { REQUEST_BODY_LIMITS, readApiBody } from '~~/server/utils/request-body'
 
 export default defineEventHandler(async (event) => {
   // This route spends the server's AI key, so it does not rely on the path-based middleware alone
   assertAccessAuthorized(event)
   const runtimeConfig = useRuntimeConfig()
-  const parsedBody = feedbackRequestSchema.safeParse(await readBody(event))
+  const body = await readApiBody(event, REQUEST_BODY_LIMITS['/api/feedback'])
+  const parsedBody = feedbackRequestSchema.safeParse(body)
   if (!parsedBody.success) {
     throw createError({
       statusCode: 400,
@@ -59,7 +62,7 @@ export default defineEventHandler(async (event) => {
         }
       } catch (error: any) {
         if (!requestAbort.signal.aborted) {
-          writer.write({ type: 'error', message: error.message })
+          writer.write({ type: 'error', message: toClientErrorMessage(String(error?.message)) })
         }
       } finally {
         if (requestAbort.reason() === 'timeout') {

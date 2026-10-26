@@ -9,17 +9,20 @@ import pLimit from 'p-limit'
 import type { ConfigAi, ConfigWebSearchProvider } from '~~/shared/types/config'
 import type { RuntimeConfig } from 'nuxt/schema'
 import { researchRequestSchema } from '~~/shared/utils/research-input'
+import { toClientErrorMessage } from '~~/shared/utils/redact'
 import { getServerProxyFetch, proxyEnvFromRuntimeConfig } from '~~/server/utils/proxy'
 import { createParallelWebSearch } from '~~/server/utils/parallel-search'
 import { getApiKeyPool } from '~~/server/utils/api-key-pool'
 import { assertAccessAuthorized } from '~~/server/utils/access'
+import { REQUEST_BODY_LIMITS, readApiBody } from '~~/server/utils/request-body'
 
 export default defineEventHandler(async (event) => {
   // This route spends the server's AI and search keys, so it does not rely on the path-based
   // middleware alone
   assertAccessAuthorized(event)
   const runtimeConfig = useRuntimeConfig()
-  const parsedBody = researchRequestSchema.safeParse(await readBody(event))
+  const body = await readApiBody(event, REQUEST_BODY_LIMITS['/api/research'])
+  const parsedBody = researchRequestSchema.safeParse(body)
   if (!parsedBody.success) {
     throw createError({
       statusCode: 400,
@@ -104,7 +107,7 @@ export default defineEventHandler(async (event) => {
         if (!requestAbort.signal.aborted) {
           writer.write({
             type: 'error',
-            message: error instanceof Error ? error.message : String(error),
+            message: toClientErrorMessage(error instanceof Error ? error.message : String(error)),
             nodeId,
           })
         }

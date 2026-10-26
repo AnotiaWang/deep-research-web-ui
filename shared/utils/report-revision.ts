@@ -1,12 +1,20 @@
 import { marked } from 'marked'
 import { z } from 'zod'
+import { researchLearningLimits } from '~~/shared/utils/research-learning'
 
 export const reportRevisionSchema = z.object({
   instruction: z.string().trim().min(1).max(2000),
-  targetLearning: z.string().min(1),
+  // Bounded like a learning: it is replayed into the revision prompt and tokenized synchronously.
+  targetLearning: z.string().min(1).max(researchLearningLimits.learning),
   firstNewCitation: z.number().int().positive(),
   blocks: z
-    .array(z.object({ id: z.number().int().nonnegative(), markdown: z.string().min(1) }))
+    .array(
+      z.object({
+        id: z.number().int().nonnegative(),
+        // Report blocks are whole markdown sections, so they get more room than a learning.
+        markdown: z.string().min(1).max(20_000),
+      }),
+    )
     .min(1)
     .max(40),
 })

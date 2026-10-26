@@ -15,6 +15,7 @@ import {
 import type { WebSearchFunction } from '~~/lib/core/web-search'
 import { normalizeGeneratedSearchQueries } from '~~/shared/utils/search-query'
 import { abortable, isAbortError, throwIfAborted } from '~~/shared/utils/abort'
+import { toClientErrorMessage } from '~~/shared/utils/redact'
 import {
   generateFallbackSearchPlan,
   generateSearchQueries,
@@ -478,7 +479,8 @@ export async function deepResearch({
             console.error(`Error in node ${searchQuery.nodeId} for query ${searchQuery.query}`, e)
             progress({
               type: 'error',
-              message: e.message,
+              // Forwarded to the browser by the SSE handler: upstream text may echo a credential.
+              message: toClientErrorMessage(e?.message ?? String(e)),
               nodeId: searchQuery.nodeId,
             })
             return {
@@ -508,7 +510,7 @@ export async function deepResearch({
     console.error(error)
     progress({
       type: 'error',
-      message: error?.message ?? 'Something went wrong',
+      message: error?.message ? toClientErrorMessage(error.message) : 'Something went wrong',
       nodeId,
     })
     return {

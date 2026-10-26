@@ -25,9 +25,15 @@ const PASSWORD = 's3cret'
 const GUARDED_ROUTES = ['feedback', 'research', 'report'] as const
 
 /** Wires up the Nuxt auto-imports that the real server modules expect. */
-function installServerGlobals(h3: H3, accessPassword: string | undefined = PASSWORD) {
+function installServerGlobals(
+  h3: H3,
+  {
+    accessPassword = PASSWORD,
+    serverMode = true,
+  }: { accessPassword?: string; serverMode?: boolean } = {},
+) {
   Object.assign(globalThis, {
-    useRuntimeConfig: () => ({ accessPassword }),
+    useRuntimeConfig: () => ({ accessPassword, public: { serverMode } }),
     getHeader: (event: any, name: string) => h3.getRequestHeader(event, name),
     getRequestURL: h3.getRequestURL,
     defineEventHandler: h3.defineEventHandler,
@@ -272,12 +278,70 @@ describe('per-handler access assertion', () => {
   })
 
   it('stays open when no password is configured', async () => {
-    Object.assign(globalThis, { useRuntimeConfig: () => ({ accessPassword: undefined }) })
+    globalThis.useRuntimeConfig = (() => ({
+      accessPassword: undefined,
+      public: { serverMode: true },
+    })) as any
     try {
       assert.equal((await post('/api/report')).status, 200)
     } finally {
-      Object.assign(globalThis, { useRuntimeConfig: () => ({ accessPassword: PASSWORD }) })
+      installServerGlobals(h3)
     }
+  })
+
+  it('refuses every route when server mode is disabled', async () => {
+    // NUXT_PUBLIC_SERVER_MODE defaults to false, and such deployments configure no password, so
+    // without this check the routes would proxy the server's keys to anyone.
+    installServerGlobals(h3, { accessPassword: '', serverMode: false })
+    harness.reached.length = 0
+    try {
+      for (const name of GUARDED_ROUTES) {
+        const response = await post(`/api/${name}`)
+        assert.equal(response.status, 401, `/api/${name} must be refused without server mode`)
+      }
+      assert.deepEqual(harness.reached, [])
+    } finally {
+      installServerGlobals(h3)
+    }
+  })
+
+  it('rejects cross-site callers that carry a valid password', async () => {
+    harness.reached.length = 0
+    const response = await post('/api/research', {
+      'x-access-password': encodeURIComponent(PASSWORD),
+      origin: 'https://evil.example',
+    })
+    assert.equal(response.status, 403)
+    assert.deepEqual(harness.reached, [])
+  })
+
+  it('accepts the same password from a same-origin caller', async () => {
+    const sameOrigin = new URL(harness.baseUrl).origin
+    for (const headers of [{ origin: sameOrigin }, {}, { 'sec-fetch-site': 'same-origin' }]) {
+      const response = await post('/api/research', {
+        'x-access-password': encodeURIComponent(PASSWORD),
+        ...headers,
+      })
+      assert.equal(response.status, 200, JSON.stringify(headers))
+    }
+  })
+
+  it('accepts a public Origin forwarded through a rewriting reverse proxy', async () => {
+    // The proxy rewrites `Host` to the internal address; the browser still reports the public one.
+    const response = await post('/api/research', {
+      'x-access-password': encodeURIComponent(PASSWORD),
+      origin: 'https://research.example.com',
+      'x-forwarded-host': 'research.example.com',
+    })
+    assert.equal(response.status, 200)
+  })
+
+  it('rejects a browser request that declares itself cross-site', async () => {
+    const response = await post('/api/research', {
+      'x-access-password': encodeURIComponent(PASSWORD),
+      'sec-fetch-site': 'cross-site',
+    })
+    assert.equal(response.status, 403)
   })
 
   // The cases above use stand-ins and would pass even if a real route forgot the check, so assert
