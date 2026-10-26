@@ -2,6 +2,7 @@
   import type { DeepReadonly } from 'vue'
   import { useServerMode } from '~/composables/useServerMode'
   import { createCitationHtml, renderSafeMarkdown } from '~/utils/markdown'
+  import { buildReportDocument, publishReportPage, type PublishedReport } from '~/utils/deed-page'
   import { getStreamErrorMessage } from '~~/shared/utils/stream-error'
   import type ResearchEvidence from './ResearchEvidence.vue'
   import type { RefinementRequest, RefinementStage } from '~/utils/research-refinement'
@@ -46,6 +47,17 @@
   const loading = ref(false)
   const loadingExportPdf = ref(false)
   const loadingExportMarkdown = ref(false)
+  const publishOpen = shallowRef(false)
+  const publishing = shallowRef(false)
+  const publishError = shallowRef('')
+  const publishExpiry = shallowRef('604800')
+  const publishedPage = shallowRef<PublishedReport>()
+  const publishExpiryItems = computed(() => [
+    { label: t('researchReport.publishExpiryDay'), value: '86400' },
+    { label: t('researchReport.publishExpiryWeek'), value: '604800' },
+    { label: t('researchReport.publishExpiryMonth'), value: '2592000' },
+    { label: t('researchReport.publishExpiryNever'), value: '0' },
+  ])
   const reasoningContent = ref('')
   const reportContent = ref('')
   const reportContainerRef = ref<HTMLElement>()
@@ -90,7 +102,8 @@
       !reportContent.value ||
       loading.value ||
       loadingExportPdf.value ||
-      loadingExportMarkdown.value,
+      loadingExportMarkdown.value ||
+      publishing.value,
   )
 
   const reportHtml = computed(() => {
@@ -113,6 +126,11 @@
     nextTick(() => {
       setupTooltips()
     })
+  })
+
+  // A published page is a snapshot; a new or regenerated report needs a new publish.
+  watch(reportContent, () => {
+    publishedPage.value = undefined
   })
 
   // 监听报告内容变化，重新设置 tooltip
@@ -322,6 +340,28 @@
     }
   }
 
+  function openPublishDialog() {
+    publishError.value = ''
+    publishOpen.value = true
+  }
+
+  async function publishToWeb() {
+    if (!reportContent.value || publishing.value) return
+    publishing.value = true
+    publishError.value = ''
+    try {
+      const html = buildReportDocument(props.query, reportHtml.value, locale.value)
+      publishedPage.value = await publishReportPage(html, {
+        ttlSeconds: Number(publishExpiry.value),
+      })
+    } catch (error) {
+      console.error('[Publish to web] failed:', error)
+      publishError.value = error instanceof Error ? error.message : String(error)
+    } finally {
+      publishing.value = false
+    }
+  }
+
   function displayReport(report: string, keepEvidence = false) {
     activeReport += 1
     // 直接显示已有的报告内容
@@ -391,7 +431,63 @@
       >
         {{ $t('researchReport.exportPdf') }}
       </UButton>
+      <UButton
+        color="info"
+        variant="ghost"
+        icon="i-lucide-globe"
+        size="sm"
+        :disabled="isExportButtonDisabled"
+        :loading="publishing"
+        @click="openPublishDialog"
+      >
+        {{ $t('researchReport.publish') }}
+      </UButton>
     </div>
+
+    <UModal
+      v-model:open="publishOpen"
+      :title="$t('researchReport.publishTitle')"
+      :description="$t('researchReport.publishDescription')"
+    >
+      <template #body>
+        <div class="flex flex-col gap-y-3">
+          <UAlert
+            color="warning"
+            variant="soft"
+            icon="i-lucide-triangle-alert"
+            :title="$t('researchReport.publishWarning')"
+          />
+          <template v-if="publishedPage">
+            <UFormField :label="$t('researchReport.publishedUrl')">
+              <ULink :to="publishedPage.url" target="_blank" rel="noopener noreferrer" external>
+                {{ publishedPage.url }}
+              </ULink>
+            </UFormField>
+            <UFormField
+              v-if="publishedPage.token"
+              :label="$t('researchReport.publishedToken')"
+              :help="$t('researchReport.publishedTokenHelp')"
+            >
+              <UInput :model-value="publishedPage.token" readonly class="w-full" />
+            </UFormField>
+          </template>
+          <template v-else>
+            <UFormField :label="$t('researchReport.publishExpiry')">
+              <USelect v-model="publishExpiry" :items="publishExpiryItems" class="w-full" />
+            </UFormField>
+            <UAlert v-if="publishError" color="error" variant="soft" :title="publishError" />
+            <div class="flex justify-end gap-2">
+              <UButton variant="ghost" @click="publishOpen = false">
+                {{ $t('researchReport.publishCancel') }}
+              </UButton>
+              <UButton icon="i-lucide-globe" :loading="publishing" @click="publishToWeb">
+                {{ $t('researchReport.publishConfirm') }}
+              </UButton>
+            </div>
+          </template>
+        </div>
+      </template>
+    </UModal>
 
     <ResearchEvidence
       v-if="evidenceVisible"

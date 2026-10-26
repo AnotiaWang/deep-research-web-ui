@@ -161,7 +161,21 @@
     "generateFailed": "生成报告失败：{0}",
     "exportFailed": "导出失败",
     "incompatibleBrowserDescription": "您的浏览器不支持这种打印方式，请考虑改用更现代的浏览器，或者导出 Markdown 并手动使用其他服务（如 https://md-to-pdf.fly.dev）将其转换为 PDF（不承诺安全性）。",
-    "incompatibleBrowser": "浏览器可能较旧"
+    "incompatibleBrowser": "浏览器可能较旧",
+    "publish": "发布到网页",
+    "publishTitle": "将报告发布为网页",
+    "publishDescription": "在免费静态托管服务 deed.page 上创建一个独立页面，并返回页面链接。",
+    "publishWarning": "页面将公开，任何拿到链接的人都能访问，请不要发布私密信息。",
+    "publishExpiry": "过期时间",
+    "publishExpiryDay": "1 天",
+    "publishExpiryWeek": "7 天",
+    "publishExpiryMonth": "30 天",
+    "publishExpiryNever": "永不过期",
+    "publishCancel": "取消",
+    "publishConfirm": "发布",
+    "publishedUrl": "页面链接",
+    "publishedToken": "管理令牌",
+    "publishedTokenHelp": "如需之后更新或删除页面，请保存此令牌。它不会保存在其他地方。"
   },
   "error": {
     "requestBlockedByCORS": "当前 API 服务可能不允许接口跨域，请换一个服务试试，或者向服务方反馈。"
