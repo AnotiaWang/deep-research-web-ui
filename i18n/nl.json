@@ -157,7 +157,21 @@
     "generateFailed": "Rapport genereren mislukt: {0}",
     "exportFailed": "Export mislukt",
     "incompatibleBrowser": "Niet-ondersteunde browser",
-    "incompatibleBrowserDescription": "Uw browser ondersteunt deze printmethode niet. Overweeg een moderne browser te gebruiken, of exporteer de Markdown en converteer deze handmatig naar PDF met behulp van andere diensten zoals https://md-to-pdf.fly.dev (Gebruik op eigen risico)"
+    "incompatibleBrowserDescription": "Uw browser ondersteunt deze printmethode niet. Overweeg een moderne browser te gebruiken, of exporteer de Markdown en converteer deze handmatig naar PDF met behulp van andere diensten zoals https://md-to-pdf.fly.dev (Gebruik op eigen risico)",
+    "publish": "Publiceren op het web",
+    "publishTitle": "Rapport publiceren op het web",
+    "publishDescription": "Maakt een losse pagina op deed.page, een gratis statische host, en geeft je de link.",
+    "publishWarning": "De pagina wordt openbaar. Iedereen met de link kan hem lezen, dus publiceer geen privégegevens.",
+    "publishExpiry": "Verloopt na",
+    "publishExpiryDay": "1 dag",
+    "publishExpiryWeek": "7 dagen",
+    "publishExpiryMonth": "30 dagen",
+    "publishExpiryNever": "Nooit",
+    "publishCancel": "Annuleren",
+    "publishConfirm": "Publiceren",
+    "publishedUrl": "Paginalink",
+    "publishedToken": "Beheertoken",
+    "publishedTokenHelp": "Bewaar dit token als je de pagina later wilt bijwerken of verwijderen. Het wordt nergens anders opgeslagen."
   },
   "error": {
     "requestBlockedByCORS": "De huidige API-provider staat mogelijk geen cross-origin-verzoeken toe. Probeer een andere API-provider of neem contact op met de provider voor ondersteuning.."

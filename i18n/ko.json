@@ -161,7 +161,21 @@
     "incompatibleBrowser": "호환되지 않는 브라우저",
     "incompatibleBrowserDescription": "현재 브라우저는 이 인쇄 방식을 지원하지 않습니다. 최신 브라우저를 사용하거나, 마크다운을 내보낸 후 https://md-to-pdf.fly.dev 같은 다른 서비스를 이용해 직접 PDF로 변환해 보세요. (이용에 따른 책임은 본인에게 있습니다)",
     "exportFailed": "내보내기 실패",
-    "generateFailed": "보고서 생성 실패: {0}"
+    "generateFailed": "보고서 생성 실패: {0}",
+    "publish": "웹에 게시",
+    "publishTitle": "보고서를 웹에 게시",
+    "publishDescription": "무료 정적 호스팅 서비스 deed.page에 독립 페이지를 만들고 링크를 제공합니다.",
+    "publishWarning": "페이지는 공개됩니다. 링크가 있는 누구나 볼 수 있으므로 개인 정보를 게시하지 마세요.",
+    "publishExpiry": "만료",
+    "publishExpiryDay": "1일",
+    "publishExpiryWeek": "7일",
+    "publishExpiryMonth": "30일",
+    "publishExpiryNever": "만료 없음",
+    "publishCancel": "취소",
+    "publishConfirm": "게시",
+    "publishedUrl": "페이지 링크",
+    "publishedToken": "관리 토큰",
+    "publishedTokenHelp": "나중에 페이지를 수정하거나 삭제하려면 이 토큰을 저장하세요. 다른 곳에는 저장되지 않습니다."
   },
   "error": {
     "requestBlockedByCORS": "현재 API 제공자가 교차 출처(cross-origin) 요청을 허용하지 않을 수 있습니다. 다른 서비스 제공자를 이용하거나 제공자에게 문의해 지원을 요청하세요."
