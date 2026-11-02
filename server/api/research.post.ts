@@ -202,4 +202,5 @@ const pooledProviders = {
   'google-pse': 'Google PSE',
   youcom: 'You.com',
   serply: 'Serply',
+  outcrawl: 'Outcrawl',
 } as const

@@ -73,6 +73,9 @@
         },
         "serply": {
           "help": "通过 Serply API 进行网页搜索（Google 结果）。需要 API 密钥，可在 {0} 获取。"
+        },
+        "outcrawl": {
+          "help": "服务端模式下通过 Outcrawl API 进行网页搜索。需要 API 密钥（每月 1,000 credits 免费额度），可在 {0} 获取。"
         }
       },
       "concurrencyLimit": "并发数",

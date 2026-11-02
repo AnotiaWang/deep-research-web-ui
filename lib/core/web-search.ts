@@ -42,7 +42,7 @@ export type WebSearchConfig = {
   tavilySearchTopic?: 'general' | 'news' | 'finance'
   /**
    * Custom fetch implementation (server-only). Used to route Google PSE /
-   * you.com / Serply requests through an outbound proxy. Tavily/Firecrawl SDKs
+   * you.com / Serply / Outcrawl requests through an outbound proxy. Tavily/Firecrawl SDKs
    * (axios-based) pick up `HTTP(S)_PROXY` env instead. Never set in the browser.
    */
   fetch?: typeof fetch
@@ -53,6 +53,7 @@ const CRW_DEFAULT_API_BASE = 'https://fastcrw.com/api'
 const YOUCOM_KEYLESS_SEARCH_URL = 'https://api.you.com/v1/agents/search'
 const YOUCOM_KEYED_SEARCH_URL = 'https://ydc-index.io/v1/search'
 const SERPLY_SEARCH_URL = 'https://api.serply.io/v1/search'
+const OUTCRAWL_SEARCH_URL = 'https://api.outcrawl.ai/v1/search'
 
 /** Single item from the You.com search API `results.web` / `results.news` arrays. */
 interface YoucomSearchResult {
@@ -75,6 +76,14 @@ interface SerplySearchResult {
     /** Present on news results, e.g. `2 days ago`. */
     published_time?: string
   }
+}
+
+/** Single item from the Outcrawl search API `hits` array. */
+interface OutcrawlSearchHit {
+  url?: string
+  title?: string
+  snippet?: string
+  rank?: number
 }
 
 /** Keeps the HTTP status so the server key pool can tell key failures from outages. */
@@ -158,6 +167,19 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
       limitations: hasDates ? ['time' as const] : [],
     }
   }
+  if (provider === 'outcrawl')
+    return {
+      // Domains are handled by the adapter with a `site:` clause in the query;
+      // the API has no time, news or language filters.
+      google: {},
+      firecrawl: {},
+      tavily: {},
+      limitations: [
+        ...(options.intent === 'news' ? ['news' as const] : []),
+        ...(time || hasDates ? ['time' as const] : []),
+        ...(options.lang ? ['language' as const] : []),
+      ],
+    }
   if (provider === 'youcom' || provider === 'parallel')
     return {
       // This adapter does not apply native filters. A mixed web/news
@@ -471,6 +493,74 @@ async function searchWithSerply(
   }
 }
 
+/**
+ * Outcrawl web search: https://outcrawl.ai/docs
+ *
+ * `POST /v1/search` with a Bearer key and `{ query, limit }` (1 to 20); the
+ * response carries `hits` with `url`, `title`, `snippet` and `rank`. The API
+ * does not answer browser preflight requests, so this provider is offered in
+ * Server Mode only.
+ */
+async function searchWithOutcrawl(
+  config: WebSearchConfig,
+  query: string,
+  options: WebSearchOptions,
+): Promise<WebSearchResult[]> {
+  const apiKey = config.apiKey
+  if (!apiKey) {
+    throw new Error('Outcrawl API key not set')
+  }
+
+  const maxResults = options.maxResults ?? 5
+  const domains = options.includeDomains ?? []
+  const siteClause = domains.map((d) => `site:${d}`).join(' OR ')
+  const q = siteClause ? `${query} ${domains.length > 1 ? `(${siteClause})` : siteClause}` : query
+
+  try {
+    const doFetch = config.fetch ?? fetch
+    const response = await doFetch(OUTCRAWL_SEARCH_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'deep-research-web-ui',
+      },
+      // The API returns at most 20 hits per request; the tail is trimmed below.
+      body: JSON.stringify({ query: q, limit: Math.min(Math.max(maxResults, 1), 20) }),
+      signal: options.signal,
+    })
+    // Error bodies from the edge may not be JSON.
+    const data = (await response.json().catch(() => ({}))) as {
+      hits?: OutcrawlSearchHit[]
+      message?: string
+    }
+
+    if (!response.ok) {
+      throw httpError(data.message || `HTTP ${response.status}`, response.status)
+    }
+
+    return (data.hits ?? [])
+      .flatMap((r): WebSearchResult[] => {
+        if (!r.url || !r.snippet) return []
+        return [
+          {
+            content: r.snippet,
+            sourceType: 'search-result' as const,
+            url: r.url,
+            ...(r.title ? { title: r.title } : {}),
+          },
+        ]
+      })
+      .slice(0, maxResults)
+  } catch (error: unknown) {
+    if (options.signal?.aborted || isAbortError(error)) throw error
+    console.error('Outcrawl search failed:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`Outcrawl Error: ${message}`, { cause: error })
+  }
+}
+
 /** Run a single web search with the given provider config. */
 export async function searchWeb(
   config: WebSearchConfig,
@@ -492,6 +582,8 @@ export async function searchWeb(
       throw new Error('Parallel Search MCP requires Server Mode (NUXT_PUBLIC_SERVER_MODE=true).')
     case 'serply':
       return searchWithSerply(config, query, options)
+    case 'outcrawl':
+      return searchWithOutcrawl(config, query, options)
     case 'tavily':
     default:
       return searchWithTavily(config, query, options)

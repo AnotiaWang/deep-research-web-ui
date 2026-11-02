@@ -18,7 +18,7 @@ Deep Research Web 能把一个研究问题变成一份带引用的报告：自�
 当前支持的供应商：
 
 - AI 服务：OpenAI compatible, SiliconFlow, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM 等
-- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply, Parallel（免密钥，仅服务端模式）
+- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply, Parallel（免密钥，仅服务端模式）, Outcrawl（仅服务端模式）
 
 喜欢本项目请点 ⭐ 收藏！
 
@@ -149,7 +149,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | 类型 | 支持的值 |
 |------|----------|
 | AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel`（仅服务端模式） |
+| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel` 和 `outcrawl`（仅服务端模式） |
 
 说明：
 
@@ -157,12 +157,13 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 - 设置 `NUXT_ACCESS_PASSWORD` 后，访问者需要先输入密码才能进行研究。公网可访问的服务端模式部署强烈建议设置，否则任何人都能使用服务器配置的 API 密钥。
 - 浏览器标记为跨站的请求（`Sec-Fetch-Site` 或 `Origin`）即使携带正确密码也会被拒绝，避免其他网站借助访问者的浏览器消耗你的额度。如果反向代理会改写 `Host`，请通过 `X-Forwarded-Host` 转发原始域名。
 - 上游错误文本会完整记录在服务端日志中，但返回浏览器前只保留状态码，因此即使服务商在错误信息里回显密钥也不会泄漏给客户端。
-- `NUXT_WEB_SEARCH_API_KEY` 支持为 Tavily、Google PSE 和 Serply 配置逗号分隔的多个密钥，例如 `key1,key2,key3`。
+- `NUXT_WEB_SEARCH_API_KEY` 支持为 Tavily、Google PSE、Serply 和 Outcrawl 配置逗号分隔的多个密钥，例如 `key1,key2,key3`。
 - Google PSE 需要同时配置 `NUXT_WEB_SEARCH_API_KEY` 和 `NUXT_PUBLIC_GOOGLE_PSE_ID`。
 - Firecrawl 自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - fastCRW（`crw`）是与 Firecrawl 兼容的网页抓取工具（单一二进制文件；可自托管或使用云服务）。默认使用云端地址 `https://fastcrw.com/api`，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（文档中记为 `CRW_API_KEY`）；自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - You.com（`youcom`）从 `NUXT_WEB_SEARCH_API_KEY` 读取密钥（可选，支持逗号分隔多密钥轮询）。未设置密钥时使用免密钥端点（每日配额有限）；可在 https://you.com/platform/api-keys 获取密钥。
 - Serply（`serply`）通过 [Serply API](https://serply.io/docs) 返回 Google 网页和新闻结果，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（支持逗号分隔多密钥轮询）。时间范围、新闻意图、语言和域名过滤会原生生效；明确的发布日期区间不会。
+- Outcrawl（`outcrawl`，仅服务端模式）通过 [Outcrawl API](https://outcrawl.ai/docs) 返回网页搜索结果，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（支持逗号分隔多密钥轮询；每月 1,000 credits 免费额度）。域名过滤通过 `site:` 子句生效；时间范围、新闻意图和语言会提示为不支持。该 API 不接受浏览器直接请求，因此本地（浏览器）模式下不提供。
 - Ollama 默认 API Base 为 `http://localhost:11434/v1`。如果应用运行在 Docker 容器内，`localhost` 指向容器自身；若 Ollama 运行在宿主机或其他容器中，请将 `NUXT_AI_API_BASE` 设置为容器可访问的宿主机地址或 Docker 网络地址。
 - LiteLLM 默认 API Base 为 `http://localhost:4000/v1`。当代理未启用认证时，API 密钥可以留空；如果代理无法通过默认本地地址访问，请设置 `NUXT_AI_API_BASE`。
 - Requesty 默认 API Base 为 `https://router.requesty.ai/v1`，模型 ID 使用 `provider/model` 格式，例如 `openai/gpt-4o`。
@@ -196,8 +197,8 @@ NUXT_NO_PROXY=localhost,127.0.0.1,::1
 ```
 
 - 支持 `http`、`https`、`socks5`、`socks5h`、`socks`。
-- `http(s)` 代理全覆盖：AI 服务商、Google PSE、you.com、Serply、Parallel，以及 Tavily / Firecrawl / CRW SDK。
-- `socks*` 代理只覆盖 AI 服务商、Google PSE、you.com、Serply 和 Parallel；Tavily / Firecrawl / CRW SDK（基于 axios）不支持 SOCKS，会直连。多数代理商同一网关的 `http://` 地址可用相同凭证，要全覆盖请用 `http://`。
+- `http(s)` 代理全覆盖：AI 服务商、Google PSE、you.com、Serply、Outcrawl、Parallel，以及 Tavily / Firecrawl / CRW SDK。
+- `socks*` 代理只覆盖 AI 服务商、Google PSE、you.com、Serply、Outcrawl 和 Parallel；Tavily / Firecrawl / CRW SDK（基于 axios）不支持 SOCKS，会直连。多数代理商同一网关的 `http://` 地址可用相同凭证，要全覆盖请用 `http://`。
 - `NUXT_NO_PROXY` 支持 `*`、精确主机和父域名（`example.com` 同时匹配 `api.example.com`）。本地 AI 网关（Ollama、LiteLLM）和自托管抓取服务靠默认值保持直连。
 - 未设置 `NUXT_PROXY_URL` 时，兼容标准的 `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` 环境变量。
 - 日志中的代理密码会自动脱敏。
