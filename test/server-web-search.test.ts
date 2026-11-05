@@ -109,3 +109,36 @@ it('rotates configured Serply keys and stops once every key is disabled', async 
     rmSync(cacheRoot, { recursive: true, force: true })
   }
 })
+
+it('rotates configured Sofya keys and stops once every key is disabled', async () => {
+  const previous = globalThis.fetch
+  const previousCwd = process.cwd()
+  const cacheRoot = mkdtempSync(path.join(tmpdir(), 'sofya-keypool-test-'))
+  const keys: (string | null)[] = []
+  let fail = false
+  globalThis.fetch = async (input, init) => {
+    assert.equal(new URL(String(input)).hostname, 'sofya.co')
+    keys.push(new Headers(init?.headers).get('Authorization'))
+    return fail
+      ? Response.json({ detail: 'Invalid API key' }, { status: 401 })
+      : Response.json({ results: [] })
+  }
+  process.chdir(cacheRoot)
+  try {
+    const search = createServerWebSearch(config('test-key-one, test-key-two', 'sofya'))
+    await search('Nuxt', {})
+    await search('Nuxt', {})
+    assert.deepEqual(keys, ['Bearer test-key-one', 'Bearer test-key-two'])
+    fail = true
+    for (let index = 0; index < 10; index++) {
+      await assert.rejects(() => search('Nuxt', {}), /Invalid API key/)
+    }
+    const requestCount = keys.length
+    await assert.rejects(() => search('Nuxt', {}), /No active Sofya API keys available/)
+    assert.equal(keys.length, requestCount)
+  } finally {
+    globalThis.fetch = previous
+    process.chdir(previousCwd)
+    rmSync(cacheRoot, { recursive: true, force: true })
+  }
+})

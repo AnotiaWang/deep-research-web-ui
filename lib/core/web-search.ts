@@ -42,7 +42,7 @@ export type WebSearchConfig = {
   tavilySearchTopic?: 'general' | 'news' | 'finance'
   /**
    * Custom fetch implementation (server-only). Used to route Google PSE /
-   * you.com / Serply requests through an outbound proxy. Tavily/Firecrawl SDKs
+   * you.com / Serply / Sofya requests through an outbound proxy. Tavily/Firecrawl SDKs
    * (axios-based) pick up `HTTP(S)_PROXY` env instead. Never set in the browser.
    */
   fetch?: typeof fetch
@@ -53,6 +53,7 @@ const CRW_DEFAULT_API_BASE = 'https://fastcrw.com/api'
 const YOUCOM_KEYLESS_SEARCH_URL = 'https://api.you.com/v1/agents/search'
 const YOUCOM_KEYED_SEARCH_URL = 'https://ydc-index.io/v1/search'
 const SERPLY_SEARCH_URL = 'https://api.serply.io/v1/search'
+const SOFYA_SEARCH_URL = 'https://sofya.co/v1/search'
 
 /** Single item from the You.com search API `results.web` / `results.news` arrays. */
 interface YoucomSearchResult {
@@ -75,6 +76,20 @@ interface SerplySearchResult {
     /** Present on news results, e.g. `2 days ago`. */
     published_time?: string
   }
+}
+
+/** Single item from the Sofya search API `results` array. */
+interface SofyaSearchResult {
+  url?: string
+  title?: string
+  /** Extracted page content, or the snippet when the page could not be read. */
+  content?: string
+  /** The result's snippet. */
+  description?: string
+  /** Whether `content` holds the page itself. */
+  fetched?: boolean
+  /** Publication date as `YYYY-MM-DD`. */
+  published_date?: string | null
 }
 
 /** Keeps the HTTP status so the server key pool can tell key failures from outages. */
@@ -156,6 +171,22 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
       serply,
       // Explicit publication-date windows (cdr) are not applied reliably.
       limitations: hasDates ? ['time' as const] : [],
+    }
+  }
+  if (provider === 'sofya') {
+    // Sofya takes one `freshness` field: a relative range or a closed `start:end` window.
+    const sofya: { topic?: 'news'; freshness?: string; include_domains?: string[] } = {}
+    if (options.intent === 'news') sofya.topic = 'news'
+    if (hasDates)
+      sofya.freshness = `${options.startDate ?? '1970-01-01'}:${options.endDate ?? new Date().toISOString().slice(0, 10)}`
+    else if (time) sofya.freshness = time
+    if (domains) sofya.include_domains = domains
+    return {
+      google: {},
+      firecrawl: {},
+      tavily: {},
+      sofya,
+      limitations: options.lang ? ['language' as const] : [],
     }
   }
   if (provider === 'youcom' || provider === 'parallel')
@@ -471,6 +502,80 @@ async function searchWithSerply(
   }
 }
 
+/**
+ * Sofya Search API: `POST https://sofya.co/v1/search` with a Bearer key.
+ *
+ * Uses `search_depth: 'basic'`, which returns the extracted text of each result
+ * page (like Firecrawl's scrape), so results that were read come back as
+ * `page` sources and the snippet is used for the rest.
+ */
+async function searchWithSofya(
+  config: WebSearchConfig,
+  query: string,
+  options: WebSearchOptions,
+): Promise<WebSearchResult[]> {
+  const apiKey = config.apiKey
+  if (!apiKey) {
+    throw new Error('Sofya API key not set')
+  }
+
+  // Ref: https://sofya.co/docs
+  const body = {
+    query,
+    // The API accepts 1-20 results per request.
+    max_results: Math.min(Math.max(options.maxResults ?? 5, 1), 20),
+    search_depth: 'basic',
+    ...buildSearchFilters('sofya', options).sofya,
+  }
+
+  try {
+    const doFetch = config.fetch ?? fetch
+    const response = await doFetch(SOFYA_SEARCH_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        // Browsers drop this header; the server route sends it as-is.
+        'User-Agent': 'deep-research-web-ui',
+      },
+      body: JSON.stringify(body),
+      signal: options.signal,
+    })
+    // Error bodies from the edge may not be JSON.
+    const data = (await response.json().catch(() => ({}))) as {
+      results?: SofyaSearchResult[]
+      detail?: unknown
+      error?: string
+    }
+
+    if (!response.ok) {
+      const detail = typeof data.detail === 'string' ? data.detail : data.error
+      throw httpError(detail || `HTTP ${response.status}`, response.status)
+    }
+
+    return (data.results ?? []).flatMap((r): WebSearchResult[] => {
+      const isPage = !!r.fetched && !!r.content
+      const content = isPage ? r.content : r.description || r.content
+      if (!r.url || !content) return []
+      return [
+        {
+          content,
+          sourceType: isPage ? ('page' as const) : ('search-result' as const),
+          url: r.url,
+          ...(r.title ? { title: r.title } : {}),
+          ...(r.published_date ? { publishedAt: r.published_date } : {}),
+        },
+      ]
+    })
+  } catch (error: unknown) {
+    if (options.signal?.aborted || isAbortError(error)) throw error
+    console.error('Sofya search failed:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`Sofya Error: ${message}`, { cause: error })
+  }
+}
+
 /** Run a single web search with the given provider config. */
 export async function searchWeb(
   config: WebSearchConfig,
@@ -492,6 +597,8 @@ export async function searchWeb(
       throw new Error('Parallel Search MCP requires Server Mode (NUXT_PUBLIC_SERVER_MODE=true).')
     case 'serply':
       return searchWithSerply(config, query, options)
+    case 'sofya':
+      return searchWithSofya(config, query, options)
     case 'tavily':
     default:
       return searchWithTavily(config, query, options)
