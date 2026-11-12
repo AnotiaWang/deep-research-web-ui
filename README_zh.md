@@ -32,22 +32,6 @@ Deep Research Web 能把一个研究问题变成一份带引用的报告：自�
 
 ---
 
-<a href="https://www.apismart.ai/" target="_blank">ApiSmart.ai</a> 通过统一 API 提供主流 AI 模型的访问。一个 API 密钥即可通过 OpenAI 兼容接口调用 LLM、图像与视频模型，无需分别管理多家供应商。支持便捷切换模型、简化计费，并通过智能路由与自动故障转移提升可靠性。
-
-<a href="https://www.apismart.ai/" target="_blank">
-<img width="100" alt="ApiSmart" src="https://github.com/user-attachments/assets/bc5255ed-7354-41cd-81ec-fd515fe833ff" />
-</a>
-
----
-
-<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">Helodata</a> 提供全球代理基础设施，覆盖 195+ 国家和地区，拥有 8000 万+ 合规授权住宅 IP，并支持住宅、ISP、不限量住宅、移动及数据中心代理等，为 AI、爬虫与自动化应用提供稳定可靠的数据访问。注册使用优惠码 **`DRWEB`**，可享专属九折！
-
-<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">
-<img width="852" alt="Helodata" src="https://github.com/user-attachments/assets/886d4c52-b558-443c-8b78-c2d46b12f9fb" />
-</a>
-
----
-
 <video width="500" src="https://github.com/user-attachments/assets/8f9baa43-a74e-4613-aebb-1bcc29a686f0" controls></video>
 
 ## 使用指南

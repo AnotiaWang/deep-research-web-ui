@@ -36,22 +36,6 @@ Please give a 🌟 Star if you like this project!
 
 ---
 
-<a href="https://www.apismart.ai/" target="_blank">ApiSmart.ai</a> provides unified access to leading AI models through a single API. Use one API key to connect with LLM, image, and video models through an OpenAI-compatible interface, without managing multiple providers separately. Switch models easily, simplify billing, and improve reliability with intelligent routing and automatic failover. Build and scale AI applications faster with one streamlined API platform.
-
-<a href="https://www.apismart.ai/" target="_blank">
-<img width="100" alt="ApiSmart" src="https://github.com/user-attachments/assets/bc5255ed-7354-41cd-81ec-fd515fe833ff" />
-</a>
-
----
-
-<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">Helodata</a> provides global proxy infrastructure covering 195+ countries and regions, with 80M+ ethically sourced residential IPs. We offer Residential, ISP, Unlimited Residential, Mobile, and Datacenter proxies for reliable data access across AI, web scraping, and automation workflows. Sign up using the promo code **`DRWEB`** to enjoy an exclusive 10% discount!
-
-<a href="https://helodata.com?ref=deepresearchwebui" target="_blank">
-<img width="852" alt="Helodata" src="https://github.com/user-attachments/assets/886d4c52-b558-443c-8b78-c2d46b12f9fb" />
-</a>
-
----
-
 ## How to use
 
 ### Inspect evidence and follow up
