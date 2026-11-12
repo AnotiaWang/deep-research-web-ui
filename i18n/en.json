@@ -73,6 +73,9 @@
         },
         "serply": {
           "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
+        },
+        "outcrawl": {
+          "help": "Web search via the Outcrawl API in Server Mode. Requires an API key (free tier of 1,000 credits a month); get one at {0}."
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",

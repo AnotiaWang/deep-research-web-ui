@@ -11,6 +11,7 @@ function validateConfig(config: Config) {
 
   const ws = config.webSearch
   if (ws.provider === 'parallel') return false // Parallel requires the server runtime.
+  if (ws.provider === 'outcrawl') return false // Outcrawl's API does not accept browser requests.
   if (ws.provider === 'tavily' && !ws.apiKey) return false
   if (ws.provider === 'serply' && !ws.apiKey) return false
   // Either apiBase or apiKey is required for firecrawl
