@@ -73,6 +73,9 @@
         },
         "serply": {
           "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
+        },
+        "sofya": {
+          "help": "Web search via the Sofya API, with the text of each result page. Server Mode only. Requires an API key; get one at {0}."
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",

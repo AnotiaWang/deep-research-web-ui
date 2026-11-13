@@ -557,3 +557,107 @@ describe('serply provider', () => {
     }
   })
 })
+
+describe('sofya provider', () => {
+  it('maps news, time, dates and domains to request fields and flags language', () => {
+    const filters = buildSearchFilters('sofya', {
+      intent: 'news',
+      timeRange: 'week',
+      includeDomains: ['example.com'],
+      lang: 'zh',
+    })
+    assert.deepEqual(filters.sofya, {
+      topic: 'news',
+      freshness: 'week',
+      include_domains: ['example.com'],
+    })
+    assert.deepEqual(filters.limitations, ['language'])
+    const dated = buildSearchFilters('sofya', { startDate: '2024-01-01', endDate: '2024-02-01' })
+    assert.deepEqual(dated.sofya, { freshness: '2024-01-01:2024-02-01' })
+    assert.deepEqual(dated.limitations, [])
+    const openEnded = buildSearchFilters('sofya', { startDate: '2024-01-01' })
+    assert.match(openEnded.sofya?.freshness ?? '', /^2024-01-01:\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('posts the query with a bearer key and maps read pages and snippets', async () => {
+    const previous = globalThis.fetch
+    let requestedUrl: URL | undefined
+    let requestInit: RequestInit | undefined
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requestedUrl = new URL(String(input))
+      requestInit = init
+      return Response.json({
+        results: [
+          {
+            title: 'Nuxt',
+            url: 'https://nuxt.com/docs',
+            content: '# Nuxt docs',
+            description: 'Snippet',
+            fetched: true,
+            published_date: '2026-01-02',
+          },
+          { url: 'https://github.com/nuxt', content: 'Snippet only', fetched: false },
+          { title: 'No url', content: 'orphan', fetched: true },
+        ],
+      })
+    }) as typeof fetch
+    try {
+      const results = await searchWeb({ provider: 'sofya', apiKey: 'test-only' }, 'nuxt', {
+        includeDomains: ['nuxt.com', 'github.com'],
+        maxResults: 30,
+      })
+      assert.equal(requestedUrl?.href, 'https://sofya.co/v1/search')
+      assert.equal(requestInit?.method, 'POST')
+      const headers = requestInit?.headers as Record<string, string>
+      assert.equal(headers.Authorization, 'Bearer test-only')
+      assert.equal(headers['User-Agent'], 'deep-research-web-ui')
+      assert.deepEqual(JSON.parse(String(requestInit?.body)), {
+        query: 'nuxt',
+        max_results: 20,
+        search_depth: 'basic',
+        include_domains: ['nuxt.com', 'github.com'],
+      })
+      assert.deepEqual(results, [
+        {
+          content: '# Nuxt docs',
+          sourceType: 'page',
+          url: 'https://nuxt.com/docs',
+          title: 'Nuxt',
+          publishedAt: '2026-01-02',
+        },
+        { content: 'Snippet only', sourceType: 'search-result', url: 'https://github.com/nuxt' },
+      ])
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+
+  it('requires a key and surfaces API errors', async () => {
+    await assert.rejects(() => searchWeb({ provider: 'sofya' }, 'query'), /Sofya API key not set/)
+
+    const previous = globalThis.fetch
+    globalThis.fetch = (async () =>
+      Response.json(
+        { detail: 'Invalid API key', error: 'unauthorized' },
+        { status: 401 },
+      )) as typeof fetch
+    try {
+      await assert.rejects(
+        () => searchWeb({ provider: 'sofya', apiKey: 'k' }, 'query'),
+        /Sofya Error: Invalid API key/,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+
+    globalThis.fetch = (async () => new Response('Bad gateway', { status: 502 })) as typeof fetch
+    try {
+      await assert.rejects(
+        () => searchWeb({ provider: 'sofya', apiKey: 'k' }, 'query'),
+        /Sofya Error: HTTP 502/,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+})

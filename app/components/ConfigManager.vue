@@ -149,6 +149,18 @@
       _help: t('settings.webSearch.providers.serply.help'),
       link: 'https://serply.io',
     },
+    ...(isServerMode.value
+      ? [
+          {
+            label: 'Sofya',
+            value: 'sofya',
+            help: 'settings.webSearch.providers.sofya.help',
+            // Only kept for easy reference in i18n Ally
+            _help: t('settings.webSearch.providers.sofya.help'),
+            link: 'https://sofya.co',
+          },
+        ]
+      : []),
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
   const selectedAiProvider = computed(() =>
