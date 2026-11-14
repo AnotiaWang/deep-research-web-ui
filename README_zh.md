@@ -85,6 +85,12 @@ docker run -p 3000:3000 --env-file .env anotia/deep-research-web:latest
 
 [![Deploy with EdgeOne Pages](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://edgeone.ai/pages/new?from=github&template=https://github.com/AnotiaWang/deep-research-web-ui&from=github)
 
+使用 [Railway](https://railway.com) 一键部署（官方 Docker 镜像，默认客户端模式）：
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/deep-research-web-ui)
+
+该模板以单个无状态服务运行 `anotia/deep-research-web:latest`，自带 HTTPS 域名和健康检查。如需切换到服务端模式，在服务中添加下方的服务端模式环境变量即可。
+
 Docker 部署（使用现成镜像）：
 
 ```bash
