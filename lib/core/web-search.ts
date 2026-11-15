@@ -1,4 +1,9 @@
 import { type ReadSourceFunction } from '~~/lib/core/read-source'
+import {
+  buildKeenableFilters,
+  createKeenableReadSource,
+  searchWithKeenable,
+} from '~~/lib/core/keenable-search'
 import { tavily } from '@tavily/core'
 import Firecrawl, {
   type Document,
@@ -42,7 +47,7 @@ export type WebSearchConfig = {
   tavilySearchTopic?: 'general' | 'news' | 'finance'
   /**
    * Custom fetch implementation (server-only). Used to route Google PSE /
-   * you.com / Serply requests through an outbound proxy. Tavily/Firecrawl SDKs
+   * you.com / Serply / Keenable requests through an outbound proxy. Tavily/Firecrawl SDKs
    * (axios-based) pick up `HTTP(S)_PROXY` env instead. Never set in the browser.
    */
   fetch?: typeof fetch
@@ -157,6 +162,10 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
       // Explicit publication-date windows (cdr) are not applied reliably.
       limitations: hasDates ? ['time' as const] : [],
     }
+  }
+  if (provider === 'keenable') {
+    const { keenable, limitations } = buildKeenableFilters(options)
+    return { google: {}, firecrawl: {}, tavily: {}, keenable, limitations }
   }
   if (provider === 'youcom' || provider === 'parallel')
     return {
@@ -492,6 +501,8 @@ export async function searchWeb(
       throw new Error('Parallel Search MCP requires Server Mode (NUXT_PUBLIC_SERVER_MODE=true).')
     case 'serply':
       return searchWithSerply(config, query, options)
+    case 'keenable':
+      return searchWithKeenable(config, query, options)
     case 'tavily':
     default:
       return searchWithTavily(config, query, options)
@@ -521,6 +532,7 @@ export function createReadSource(config: WebSearchConfig): ReadSourceFunction | 
       if (!result?.rawContent) return undefined
       return { url, finalUrl: result.url, content: result.rawContent, sourceType: 'page' }
     }
+  if (config.provider === 'keenable') return createKeenableReadSource(config)
   if (config.provider === 'firecrawl')
     return async (url, { signal }) => {
       const client = new Firecrawl({

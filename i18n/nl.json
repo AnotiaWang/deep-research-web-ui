@@ -69,6 +69,10 @@
         },
         "serply": {
           "help": "Zoeken op het web via de Serply API (Google-resultaten). Vereist een API-sleutel; vraag er een aan op {0}."
+        },
+        "keenable": {
+          "help": "Zoeken op het web en pagina’s lezen via de Keenable API. Werkt zonder API-sleutel (1.000 verzoeken per uur per IP); voeg een sleutel toe via {0} om de uurlimiet op te heffen.",
+          "apiKeyPlaceholder": "Optioneel — laat leeg voor het sleutelloze openbare endpoint"
         }
       },
       "concurrencyLimitHelp": "Beperk de gelijktijdige zoektaken. Dit is handig om te voorkomen dat de zoekmachine overbelast raakt en verzoeken mislukken.",

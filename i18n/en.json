@@ -73,6 +73,10 @@
         },
         "serply": {
           "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
+        },
+        "keenable": {
+          "help": "Web search and page reading via the Keenable API. Works without an API key (1,000 requests per hour per IP); add a key from {0} to remove the hourly limit.",
+          "apiKeyPlaceholder": "Optional — leave empty for the keyless public endpoint"
         }
       },
       "concurrencyLimitHelp": "Limit the concurrent search tasks. This is useful to avoid overloading the search provider and causing requests to fail.",

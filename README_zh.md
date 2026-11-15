@@ -18,7 +18,7 @@ Deep Research Web 能把一个研究问题变成一份带引用的报告：自�
 当前支持的供应商：
 
 - AI 服务：OpenAI compatible, SiliconFlow, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM 等
-- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply, Parallel（免密钥，仅服务端模式）
+- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply, Parallel（免密钥，仅服务端模式）, Keenable（免密钥可用）
 
 喜欢本项目请点 ⭐ 收藏！
 
@@ -133,7 +133,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | 类型 | 支持的值 |
 |------|----------|
 | AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel`（仅服务端模式） |
+| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel`（仅服务端模式）, `keenable` |
 
 说明：
 
@@ -141,12 +141,13 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 - 设置 `NUXT_ACCESS_PASSWORD` 后，访问者需要先输入密码才能进行研究。公网可访问的服务端模式部署强烈建议设置，否则任何人都能使用服务器配置的 API 密钥。
 - 浏览器标记为跨站的请求（`Sec-Fetch-Site` 或 `Origin`）即使携带正确密码也会被拒绝，避免其他网站借助访问者的浏览器消耗你的额度。如果反向代理会改写 `Host`，请通过 `X-Forwarded-Host` 转发原始域名。
 - 上游错误文本会完整记录在服务端日志中，但返回浏览器前只保留状态码，因此即使服务商在错误信息里回显密钥也不会泄漏给客户端。
-- `NUXT_WEB_SEARCH_API_KEY` 支持为 Tavily、Google PSE 和 Serply 配置逗号分隔的多个密钥，例如 `key1,key2,key3`。
+- `NUXT_WEB_SEARCH_API_KEY` 支持为 Tavily、Google PSE、Serply 和 Keenable 配置逗号分隔的多个密钥，例如 `key1,key2,key3`。
 - Google PSE 需要同时配置 `NUXT_WEB_SEARCH_API_KEY` 和 `NUXT_PUBLIC_GOOGLE_PSE_ID`。
 - Firecrawl 自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - fastCRW（`crw`）是与 Firecrawl 兼容的网页抓取工具（单一二进制文件；可自托管或使用云服务）。默认使用云端地址 `https://fastcrw.com/api`，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（文档中记为 `CRW_API_KEY`）；自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - You.com（`youcom`）从 `NUXT_WEB_SEARCH_API_KEY` 读取密钥（可选，支持逗号分隔多密钥轮询）。未设置密钥时使用免密钥端点（每日配额有限）；可在 https://you.com/platform/api-keys 获取密钥。
 - Serply（`serply`）通过 [Serply API](https://serply.io/docs) 返回 Google 网页和新闻结果，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（支持逗号分隔多密钥轮询）。时间范围、新闻意图、语言和域名过滤会原生生效；明确的发布日期区间不会。
+- Keenable（`keenable`）从 `NUXT_WEB_SEARCH_API_KEY` 读取密钥（可选，支持逗号分隔多密钥轮询）。未设置密钥时使用公共端点，每个 IP 每小时 1,000 次、每秒 10 次请求（[速率限制](https://docs.keenable.ai/rate-limits)）；在 https://docs.keenable.ai/api-keys 获取密钥可取消每小时上限。搜索会发送查询内容，页面读取会发送来源 URL；免密钥请求会记录查询或 URL、IP 地址和 User-Agent（[说明](https://docs.keenable.ai/authentication#try-it-without-a-key)）。时间范围、明确日期和单个域名会原生生效；新闻意图、多个域名和语言会作为限制提示。客户端模式和服务端模式均可使用，也可替代 Google PSE：Google 已表示现有 Custom Search JSON API 用户需在 2027 年 1 月 1 日前迁移（[说明](https://developers.google.com/custom-search/v1/overview)）。
 - Ollama 默认 API Base 为 `http://localhost:11434/v1`。如果应用运行在 Docker 容器内，`localhost` 指向容器自身；若 Ollama 运行在宿主机或其他容器中，请将 `NUXT_AI_API_BASE` 设置为容器可访问的宿主机地址或 Docker 网络地址。
 - LiteLLM 默认 API Base 为 `http://localhost:4000/v1`。当代理未启用认证时，API 密钥可以留空；如果代理无法通过默认本地地址访问，请设置 `NUXT_AI_API_BASE`。
 - Requesty 默认 API Base 为 `https://router.requesty.ai/v1`，模型 ID 使用 `provider/model` 格式，例如 `openai/gpt-4o`。

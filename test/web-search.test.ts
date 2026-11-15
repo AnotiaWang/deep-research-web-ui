@@ -557,3 +557,165 @@ describe('serply provider', () => {
     }
   })
 })
+
+describe('keenable provider', () => {
+  it('maps time, dates and a single domain natively and reports the rest', () => {
+    const filters = buildSearchFilters('keenable', {
+      intent: 'news',
+      timeRange: 'week',
+      includeDomains: ['example.com'],
+      lang: 'en',
+    })
+    assert.deepEqual(filters.keenable, { published_after: '7d', site: 'example.com' })
+    assert.deepEqual(filters.limitations, ['news', 'language'])
+
+    const dated = buildSearchFilters('keenable', {
+      startDate: '2024-01-01',
+      endDate: '2024-02-29',
+      includeDomains: ['a.example', 'b.example'],
+    })
+    // endDate stays inclusive: published_before is the following day.
+    assert.deepEqual(dated.keenable, {
+      published_after: '2024-01-01',
+      published_before: '2024-03-01',
+    })
+    assert.deepEqual(dated.limitations, ['domains'])
+    assert.deepEqual(buildSearchFilters('keenable', {}).limitations, [])
+  })
+
+  it('uses the keyless public endpoint with an app title and no API key', async () => {
+    const previous = globalThis.fetch
+    let requestedUrl: URL | undefined
+    let requestInit: any
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requestedUrl = new URL(String(input))
+      requestInit = init
+      // Shape returned live by POST /v1/search/public (checked 2026-11-15).
+      return Response.json({
+        query: 'AI product launches',
+        mode: 'pro',
+        results: [
+          {
+            title: 'Result one',
+            url: 'https://example.com/one',
+            description: '',
+            snippet: 'An excerpt from the page',
+            published_at: '2026-09-01T00:00:00Z',
+            acquired_at: '2026-09-02T00:00:00Z',
+          },
+          { title: 'No url', url: '', snippet: 'orphan' },
+          { title: 'No text', url: 'https://example.com/empty', snippet: '' },
+          { url: 'https://example.com/two', description: 'Only a description' },
+        ],
+      })
+    }) as typeof fetch
+    try {
+      const notices: string[][] = []
+      const results = await searchWeb({ provider: 'keenable' }, 'AI product launches', {
+        maxResults: 7,
+        timeRange: 'month',
+        onNotice: (value) => notices.push(value),
+      })
+      assert.equal(requestedUrl?.href, 'https://api.keenable.ai/v1/search/public')
+      assert.equal(requestInit.method, 'POST')
+      assert.equal(requestInit.headers['X-Keenable-Title'], 'deep-research-web-ui')
+      assert.equal(requestInit.headers['X-API-Key'], undefined)
+      assert.deepEqual(JSON.parse(requestInit.body), {
+        query: 'AI product launches',
+        max_results: 7,
+        published_after: '1mo',
+      })
+      assert.deepEqual(results, [
+        {
+          content: 'An excerpt from the page',
+          sourceType: 'search-result',
+          url: 'https://example.com/one',
+          title: 'Result one',
+          publishedAt: '2026-09-01T00:00:00Z',
+        },
+        {
+          content: 'Only a description',
+          sourceType: 'search-result',
+          url: 'https://example.com/two',
+        },
+      ])
+      assert.deepEqual(notices, [[]])
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+
+  it('uses the keyed endpoint with X-API-Key and surfaces HTTP errors with status', async () => {
+    const previous = globalThis.fetch
+    let requestedUrl: URL | undefined
+    let requestHeaders: Record<string, string> = {}
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requestedUrl = new URL(String(input))
+      requestHeaders = init?.headers ?? {}
+      return Response.json(
+        { error: 'Authentication failed', message: 'Malformed API key' },
+        { status: 401 },
+      )
+    }) as typeof fetch
+    try {
+      const error = await searchWeb({ provider: 'keenable', apiKey: 'test-only' }, 'query').then(
+        () => assert.fail('expected an error'),
+        (value: any) => value,
+      )
+      assert.equal(requestedUrl?.href, 'https://api.keenable.ai/v1/search')
+      assert.equal(requestHeaders['X-API-Key'], 'test-only')
+      assert.equal(requestHeaders['X-Keenable-Title'], undefined)
+      assert.match(error.message, /Keenable search failed \(keyed\): HTTP 401: Malformed API key/)
+      assert.equal(error.cause.status, 401)
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+
+  it('reads a source page as markdown through the fetch endpoint', async () => {
+    const previous = globalThis.fetch
+    const requests: { url: URL; headers: Record<string, string> }[] = []
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requests.push({ url: new URL(String(input)), headers: init?.headers ?? {} })
+      return Response.json({
+        url: 'https://example.com/final',
+        title: 'Page',
+        content: '# Page\n\nBody',
+        truncated: false,
+      })
+    }) as typeof fetch
+    try {
+      const keyless = createReadSource({ provider: 'keenable' })!
+      const page = await keyless('https://example.com/a', {})
+      assert.equal(
+        requests[0]?.url.origin + requests[0]!.url.pathname,
+        'https://api.keenable.ai/v1/fetch/public',
+      )
+      assert.equal(requests[0]?.url.searchParams.get('url'), 'https://example.com/a')
+      assert.equal(requests[0]?.headers['X-Keenable-Title'], 'deep-research-web-ui')
+      assert.deepEqual(page, {
+        url: 'https://example.com/a',
+        finalUrl: 'https://example.com/final',
+        title: 'Page',
+        content: '# Page\n\nBody',
+        sourceType: 'page',
+      })
+
+      await createReadSource({ provider: 'keenable', apiKey: 'k' })!('https://example.com/b', {})
+      assert.equal(requests[1]?.url.pathname, '/v1/fetch')
+      assert.equal(requests[1]?.headers['X-API-Key'], 'k')
+    } finally {
+      globalThis.fetch = previous
+    }
+
+    globalThis.fetch = (async () => Response.json({ content: '  ' })) as typeof fetch
+    try {
+      assert.equal(
+        await createReadSource({ provider: 'keenable' })!('https://example.com', {}),
+        undefined,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+})
