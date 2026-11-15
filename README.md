@@ -87,6 +87,12 @@ One-click deploy with [EdgeOne Pages](https://edgeone.ai/products/pages):
 
 [![Deploy with EdgeOne Pages](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://edgeone.ai/pages/new?from=github&template=https://github.com/AnotiaWang/deep-research-web-ui&from=github)
 
+One-click deploy with [Railway](https://railway.com) (official Docker image, Client Mode by default):
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/deep-research-web-ui)
+
+The template runs `anotia/deep-research-web:latest` as a single stateless service with an HTTPS domain and a healthcheck. To switch it to Server Mode, add the Server Mode environment variables below to the service.
+
 Use pre-built Docker image:
 
 ```bash
