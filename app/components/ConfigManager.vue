@@ -149,6 +149,14 @@
       _help: t('settings.webSearch.providers.serply.help'),
       link: 'https://serply.io',
     },
+    {
+      label: 'Keenable',
+      value: 'keenable',
+      help: 'settings.webSearch.providers.keenable.help',
+      // Only kept for easy reference in i18n Ally
+      _help: t('settings.webSearch.providers.keenable.help'),
+      link: 'https://docs.keenable.ai/api-keys',
+    },
   ])
   const tavilySearchTopicOptions = ['general', 'news', 'finance']
   const selectedAiProvider = computed(() =>
@@ -385,7 +393,7 @@
                 :label="$t('settings.webSearch.apiKey')"
                 :required="
                   !config.webSearch.apiBase &&
-                  !['youcom', 'parallel'].includes(config.webSearch.provider)
+                  !['youcom', 'parallel', 'keenable'].includes(config.webSearch.provider)
                 "
               >
                 <PasswordInput
@@ -394,7 +402,9 @@
                   :placeholder="
                     config.webSearch.provider === 'youcom'
                       ? $t('settings.webSearch.providers.youcom.apiKeyPlaceholder')
-                      : $t('settings.webSearch.apiKey')
+                      : config.webSearch.provider === 'keenable'
+                        ? $t('settings.webSearch.providers.keenable.apiKeyPlaceholder')
+                        : $t('settings.webSearch.apiKey')
                   "
                   :disabled="isServerMode"
                 />

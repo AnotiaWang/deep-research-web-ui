@@ -73,6 +73,10 @@
         },
         "serply": {
           "help": "通过 Serply API 进行网页搜索（Google 结果）。需要 API 密钥，可在 {0} 获取。"
+        },
+        "keenable": {
+          "help": "通过 Keenable API 进行网页搜索和页面读取。无需 API 密钥即可使用（每个 IP 每小时 1,000 次请求）；在 {0} 获取密钥可取消每小时限制。",
+          "apiKeyPlaceholder": "可选 — 留空则使用免密钥公共端点"
         }
       },
       "concurrencyLimit": "并发数",

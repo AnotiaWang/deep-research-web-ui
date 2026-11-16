@@ -156,9 +156,12 @@ export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFu
     if (provider === 'google-pse' && !runtimeConfig.public.googlePseId) {
       throw new Error('NUXT_PUBLIC_GOOGLE_PSE_ID environment variable not set.')
     }
-    // You.com works keyless; when keys are configured, rotate them like
-    // the other keyed providers (comma-separated NUXT_WEB_SEARCH_API_KEY).
-    if (provider === 'youcom' && !runtimeConfig.webSearchApiKey?.trim()) {
+    // You.com and Keenable work keyless; when keys are configured, rotate them
+    // like the other keyed providers (comma-separated NUXT_WEB_SEARCH_API_KEY).
+    if (
+      (provider === 'youcom' || provider === 'keenable') &&
+      !runtimeConfig.webSearchApiKey?.trim()
+    ) {
       return searchWeb({ ...sharedConfig, apiKey: undefined }, query, options)
     }
 
@@ -178,6 +181,22 @@ export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFu
       apiKey: runtimeConfig.webSearchApiKey,
       apiBase: runtimeConfig.webSearchApiBase,
     })
+  } else if (provider === 'keenable') {
+    readSource = !runtimeConfig.webSearchApiKey?.trim()
+      ? createReadSource({ provider, fetch: proxyFetch })
+      : (url, options) =>
+          getApiKeyPool('keenable', runtimeConfig.webSearchApiKey).withKey(
+            (apiKey) => createReadSource({ provider, apiKey, fetch: proxyFetch })!(url, options),
+            {
+              label: 'Keenable',
+              signal: options.signal,
+              // Page-level failures must not disable an otherwise valid API key.
+              isKeyError: (error) => {
+                const status = (error as { status?: number })?.status
+                return status === 401 || status === 403
+              },
+            },
+          )
   } else if (provider === 'tavily') {
     readSource = (url, options) =>
       getApiKeyPool('tavily', runtimeConfig.webSearchApiKey).withKey(
@@ -202,4 +221,5 @@ const pooledProviders = {
   'google-pse': 'Google PSE',
   youcom: 'You.com',
   serply: 'Serply',
+  keenable: 'Keenable',
 } as const
