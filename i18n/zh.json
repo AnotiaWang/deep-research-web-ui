@@ -73,6 +73,9 @@
         },
         "serply": {
           "help": "通过 Serply API 进行网页搜索（Google 结果）。需要 API 密钥，可在 {0} 获取。"
+        },
+        "sofya": {
+          "help": "通过 Sofya API 进行网页搜索，并返回每个结果页面的正文。仅限服务端模式。需要 API 密钥，可在 {0} 获取。"
         }
       },
       "concurrencyLimit": "并发数",
