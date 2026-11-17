@@ -557,3 +557,108 @@ describe('serply provider', () => {
     }
   })
 })
+
+describe('outcrawl provider', () => {
+  it('reports time, news and language as unsupported but keeps domain filters', () => {
+    const filters = buildSearchFilters('outcrawl', {
+      intent: 'news',
+      timeRange: 'week',
+      includeDomains: ['example.com', 'example.org'],
+      lang: 'zh',
+    })
+    assert.deepEqual(filters.limitations, ['news', 'time', 'language'])
+    assert.deepEqual(buildSearchFilters('outcrawl', { includeDomains: ['example.com'] }).limitations, [])
+    const dated = buildSearchFilters('outcrawl', { startDate: '2024-01-01', endDate: '2024-02-01' })
+    assert.deepEqual(dated.limitations, ['time'])
+  })
+
+  it('posts the query with a Bearer key, a site clause for domains, and clamps limit to the API cap', async () => {
+    const previous = globalThis.fetch
+    let requestedUrl: URL | undefined
+    let requestedInit: any
+    globalThis.fetch = (async (input: any, init?: any) => {
+      requestedUrl = new URL(String(input))
+      requestedInit = init
+      return Response.json({
+        hits: Array.from({ length: 22 }, (_, index) => ({
+          url: `https://example.com/${index}`,
+          title: `Result ${index}`,
+          snippet: `Snippet ${index}`,
+          rank: index + 1,
+        })),
+        usage: { credits: '0.5' },
+      })
+    }) as typeof fetch
+    try {
+      const results = await searchWeb({ provider: 'outcrawl', apiKey: 'test-only' }, 'nuxt', {
+        includeDomains: ['nuxt.com', 'github.com'],
+        maxResults: 21,
+      })
+      assert.equal(requestedUrl?.href, 'https://api.outcrawl.ai/v1/search')
+      assert.equal(requestedInit.method, 'POST')
+      assert.equal(requestedInit.headers.Authorization, 'Bearer test-only')
+      assert.equal(requestedInit.headers['Content-Type'], 'application/json')
+      assert.equal(requestedInit.headers['User-Agent'], 'deep-research-web-ui')
+      assert.deepEqual(JSON.parse(requestedInit.body), {
+        query: 'nuxt (site:nuxt.com OR site:github.com)',
+        limit: 20,
+      })
+      assert.equal(results.length, 21)
+      assert.deepEqual(results[0], {
+        content: 'Snippet 0',
+        sourceType: 'search-result',
+        url: 'https://example.com/0',
+        title: 'Result 0',
+      })
+
+      await searchWeb({ provider: 'outcrawl', apiKey: 'test-only' }, 'nuxt', {
+        includeDomains: ['nuxt.com'],
+      })
+      assert.deepEqual(JSON.parse(requestedInit.body), { query: 'nuxt site:nuxt.com', limit: 5 })
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+
+  it('requires a key, drops hits without url or snippet, and surfaces API errors', async () => {
+    await assert.rejects(() => searchWeb({ provider: 'outcrawl' }, 'query'), /Outcrawl API key not set/)
+
+    const previous = globalThis.fetch
+    globalThis.fetch = (async () =>
+      Response.json({
+        hits: [
+          { title: 'No url', snippet: 'orphan' },
+          { url: 'https://example.com/empty', title: 'No text' },
+        ],
+      })) as typeof fetch
+    try {
+      assert.deepEqual(await searchWeb({ provider: 'outcrawl', apiKey: 'k' }, 'query'), [])
+    } finally {
+      globalThis.fetch = previous
+    }
+
+    globalThis.fetch = (async () =>
+      Response.json(
+        { code: 'unauthorized', message: 'Invalid API key' },
+        { status: 401 },
+      )) as typeof fetch
+    try {
+      await assert.rejects(
+        () => searchWeb({ provider: 'outcrawl', apiKey: 'k' }, 'query'),
+        (error: any) => /Outcrawl Error: Invalid API key/.test(error.message) && error.cause?.status === 401,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+
+    globalThis.fetch = (async () => new Response('Bad gateway', { status: 502 })) as typeof fetch
+    try {
+      await assert.rejects(
+        () => searchWeb({ provider: 'outcrawl', apiKey: 'k' }, 'query'),
+        /Outcrawl Error: HTTP 502/,
+      )
+    } finally {
+      globalThis.fetch = previous
+    }
+  })
+})

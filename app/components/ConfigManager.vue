@@ -139,6 +139,13 @@
             _help: t('settings.webSearch.providers.parallel.help'),
             link: 'https://docs.parallel.ai/integrations/mcp/search-mcp',
           },
+          {
+            label: 'Outcrawl',
+            value: 'outcrawl',
+            help: 'settings.webSearch.providers.outcrawl.help',
+            _help: t('settings.webSearch.providers.outcrawl.help'),
+            link: 'https://outcrawl.ai',
+          },
         ]
       : []),
     {
