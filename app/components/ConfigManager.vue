@@ -130,6 +130,13 @@
       _help: t('settings.webSearch.providers.youcom.help'),
       link: 'https://you.com/platform/api-keys',
     },
+    {
+      label: 'SpecStream',
+      value: 'specstream',
+      help: 'settings.webSearch.providers.specstream.help',
+      _help: t('settings.webSearch.providers.specstream.help'),
+      link: 'https://specstream.ai/agents.md',
+    },
     ...(isServerMode.value
       ? [
           {

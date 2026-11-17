@@ -71,6 +71,9 @@
         "parallel": {
           "help": "Free, keyless search and source reading in Server Mode. Public deployments share anonymous rate limits."
         },
+        "specstream": {
+          "help": "Web search via SpecStream. Get one API key at {0}."
+        },
         "serply": {
           "help": "Web search via the Serply API (Google results). Requires an API key; get one at {0}."
         }

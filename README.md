@@ -20,7 +20,7 @@ Features:
 Currently available providers:
 
 - AI: OpenAI compatible, [ApiSmart](https://www.apismart.ai), SiliconFlow, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM and more
-- Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE, You.com, [Serply](https://serply.io), Parallel (keyless, Server Mode only)
+- Web Search: Tavily (1000 free credits / month), [Firecrawl](https://firecrawl.dev) (cloud / self-hosted), fastCRW (cloud / self-hosted), Google PSE, You.com, [Serply](https://serply.io), SpecStream, Parallel (keyless, Server Mode only)
 
 Please give a 🌟 Star if you like this project!
 
@@ -141,7 +141,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | Type | Supported values |
 |------|------------------|
 | AI provider | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel` (Server Mode only) |
+| Web search provider | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `specstream`, `parallel` (Server Mode only) |
 
 Notes:
 
