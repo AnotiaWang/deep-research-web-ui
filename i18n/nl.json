@@ -49,6 +49,9 @@
         "firecrawl": {
           "help": "Ontvang een API-sleutel bij {0} als u de officiële service gebruikt."
         },
+        "context": {
+          "help": "Zoek op het web met vraagrelevante Highlights en lees pagina’s op aanvraag. Vereist een API-sleutel van {0}."
+        },
         "crw": {
           "help": "Firecrawl-compatibele webscraper (één binary; self-host of cloud). Ontvang een API-sleutel bij {0} als u de clouddienst gebruikt, of stel de API-basis-URL in op uw zelf-gehoste server."
         },

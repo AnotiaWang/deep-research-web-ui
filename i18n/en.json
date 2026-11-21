@@ -53,6 +53,9 @@
         "firecrawl": {
           "help": "Get one API key at {0} if you are using the official service."
         },
+        "context": {
+          "help": "Web search with query-relevant Highlights and on-demand page reading. Requires an API key from {0}."
+        },
         "crw": {
           "help": "Firecrawl-compatible web scraper (single binary; self-host or cloud). Get one API key at {0} if you are using the cloud service, or set the API base URL to your self-hosted server."
         },

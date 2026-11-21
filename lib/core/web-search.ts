@@ -11,6 +11,7 @@ import {
   type SearchConstraints,
   type SearchLimitation,
 } from '~~/shared/utils/search-plan'
+import { isReadableUrl } from '~~/shared/utils/source-url'
 import { abortable, isAbortError } from '~~/shared/utils/abort'
 import type { ConfigWebSearchProvider } from '~~/shared/types/config'
 import type { WebSearchResult } from '~~/shared/types/types'
@@ -42,7 +43,7 @@ export type WebSearchConfig = {
   tavilySearchTopic?: 'general' | 'news' | 'finance'
   /**
    * Custom fetch implementation (server-only). Used to route Google PSE /
-   * you.com / Serply requests through an outbound proxy. Tavily/Firecrawl SDKs
+   * you.com / Context / Serply requests through an outbound proxy. Tavily/Firecrawl SDKs
    * (axios-based) pick up `HTTP(S)_PROXY` env instead. Never set in the browser.
    */
   fetch?: typeof fetch
@@ -142,6 +143,29 @@ export function buildSearchFilters(provider: ConfigWebSearchProvider, options: W
   } else if (domains) limits.push('domains')
   if (options.intent === 'news') limits.push('news')
   if (provider === 'google-pse') return { google, firecrawl: {}, tavily: {}, limitations: limits }
+  if (provider === 'context')
+    return {
+      google: {},
+      firecrawl: {},
+      tavily: {},
+      context: {
+        freshness:
+          hasDates || !time
+            ? undefined
+            : {
+                day: 'last_24_hours',
+                week: 'last_week',
+                month: 'last_month',
+                year: 'last_year',
+              }[time],
+        includeDomains: domains,
+        languages: options.lang ? [options.lang] : undefined,
+      },
+      limitations: [
+        ...(options.intent === 'news' ? ['news' as const] : []),
+        ...(hasDates ? ['time' as const] : []),
+      ],
+    }
   if (provider === 'serply') {
     // Serply proxies Google web search, so the Google URL parameters apply.
     // Domains are handled by the adapter with a `site:` clause in the query.
@@ -239,6 +263,111 @@ async function searchWithFirecrawlCompatible(
   )
 
   return mapFirecrawlResults([...(results.web ?? []), ...(results.news ?? [])])
+}
+
+async function requestContext(
+  config: WebSearchConfig,
+  path: 'search' | 'scrape',
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<Record<string, unknown>> {
+  const apiKey = config.apiKey?.trim()
+  if (!apiKey) throw new Error('Context.dev API key not set')
+  let response: Response
+  try {
+    response = await (config.fetch ?? fetch)(`https://api.context.dev/v1/web/${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+      redirect: 'error',
+    })
+  } catch (error) {
+    if (signal?.aborted || isAbortError(error))
+      throw new DOMException('The operation was aborted.', 'AbortError')
+    // Transport diagnostics can include the Authorization header or escaped credentials.
+    throw new TypeError('Context.dev request failed')
+  }
+  if (!response.ok) throw httpError(`Context.dev Error: HTTP ${response.status}`, response.status)
+  let data: unknown
+  try {
+    data = await response.json()
+  } catch (error) {
+    if (signal?.aborted || isAbortError(error))
+      throw new DOMException('The operation was aborted.', 'AbortError')
+    throw new Error('Context.dev returned invalid JSON')
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data))
+    throw new Error('Context.dev returned an invalid response')
+  return data as Record<string, unknown>
+}
+
+async function searchWithContext(
+  config: WebSearchConfig,
+  query: string,
+  options: WebSearchOptions,
+): Promise<WebSearchResult[]> {
+  const count = options.maxResults ?? 5
+  if (!query.trim() || query.trim().length > 500)
+    throw new Error('Context.dev search queries must contain 1–500 characters')
+  if (!Number.isInteger(count) || count < 1)
+    throw new Error('Context.dev result count must be a positive integer')
+  const maxResults = Math.min(count, 100)
+  const data = await requestContext(
+    config,
+    'search',
+    {
+      query: query.trim(),
+      numResults: maxResults,
+      highlightsOptions: { enabled: true, maxCharacters: 1000 },
+      ...buildSearchFilters('context', options).context,
+    },
+    options.signal,
+  )
+  if ((data.partial !== undefined && data.partial !== false) || !Array.isArray(data.results))
+    throw new Error('Context.dev returned incomplete or invalid search results')
+  return data.results.slice(0, maxResults).flatMap((value): WebSearchResult[] => {
+    if (!value || typeof value !== 'object')
+      throw new Error('Context.dev returned an invalid search result')
+    const row = value as {
+      url?: unknown
+      title?: unknown
+      highlights?: unknown
+      description?: unknown
+    }
+    if (typeof row.url !== 'string' || !isReadableUrl(row.url) || typeof row.title !== 'string')
+      throw new Error('Context.dev returned an invalid source URL or title')
+    let content = ''
+    if (row.highlights != null) {
+      const highlights = row.highlights as { code?: unknown; highlights?: unknown }
+      if (
+        typeof highlights.code !== 'string' ||
+        ![
+          'SUCCESS',
+          'NOT_REQUESTED',
+          'TIMEOUT',
+          'CONTENT_TOO_LARGE',
+          'WEBSITE_ACCESS_ERROR',
+          'WEBSITE_BLOCKED',
+          'ERROR',
+        ].includes(highlights.code)
+      )
+        throw new Error('Context.dev returned invalid Highlights')
+      if (highlights.code === 'SUCCESS') {
+        const passages = highlights.highlights
+        if (!Array.isArray(passages) || passages.some((text) => typeof text !== 'string'))
+          throw new Error('Context.dev returned invalid Highlights')
+        content = passages.join('\n').trim()
+      }
+    }
+    if (!content) {
+      if (row.description != null && typeof row.description !== 'string')
+        throw new Error('Context.dev returned an invalid search description')
+      if (!row.description) return []
+      content = `[Highlights unavailable; search description only.] ${row.description}`
+    }
+    return [{ url: row.url, title: row.title, content, sourceType: 'search-result' }]
+  })
 }
 
 async function searchWithGooglePse(
@@ -484,6 +613,8 @@ export async function searchWeb(
     case 'firecrawl':
     case 'crw':
       return searchWithFirecrawlCompatible(config, query, options)
+    case 'context':
+      return searchWithContext(config, query, options)
     case 'google-pse':
       return searchWithGooglePse(config, query, options)
     case 'youcom':
@@ -508,6 +639,32 @@ export function createWebSearch(config: WebSearchConfig): WebSearchFunction {
 
 /** Capability is explicit: CRW search compatibility does not imply scrape support. */
 export function createReadSource(config: WebSearchConfig): ReadSourceFunction | undefined {
+  if (config.provider === 'context')
+    return async (url, { signal }) => {
+      if (!isReadableUrl(url)) return undefined
+      const data = await requestContext(
+        config,
+        'scrape',
+        {
+          url,
+          formats: { markdown: true },
+          sharedParams: { mainContentOnly: true },
+          timeoutOpts: { milliseconds: 15_000, behavior: 'fail' },
+        },
+        signal,
+      )
+      const markdown = data.markdown as { success?: unknown; data?: unknown } | undefined
+      if (
+        (data.isPartial !== undefined && data.isPartial !== false) ||
+        markdown?.success !== true ||
+        typeof markdown.data !== 'string' ||
+        !markdown.data.trim()
+      )
+        return undefined
+      if (typeof data.url !== 'string' || !isReadableUrl(data.url))
+        throw new Error('Context.dev returned an invalid page URL')
+      return { url, finalUrl: data.url, content: markdown.data, sourceType: 'page' }
+    }
   if (config.provider === 'tavily')
     return async (url, { signal }) => {
       const response = await abortable(

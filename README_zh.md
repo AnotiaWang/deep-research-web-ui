@@ -18,7 +18,7 @@ Deep Research Web 能把一个研究问题变成一份带引用的报告：自�
 当前支持的供应商：
 
 - AI 服务：OpenAI compatible, SiliconFlow, DeepSeek, OpenRouter, Requesty, Ollama, LiteLLM 等
-- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply, Parallel（免密钥，仅服务端模式）
+- 联网搜索服务：Tavily (每月 1000 次免费搜索), Firecrawl（支持自部署）, Context.dev, fastCRW（支持自部署）, Google PSE, You.com（免密钥可用）, Serply, Parallel（免密钥，仅服务端模式）
 
 喜欢本项目请点 ⭐ 收藏！
 
@@ -139,7 +139,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 | 类型 | 支持的值 |
 |------|----------|
 | AI 服务商 | `openai-compatible`, `siliconflow`, `302-ai`, `openrouter`, `requesty`, `deepseek`, `ollama`, `litellm` |
-| 联网搜索服务商 | `tavily`, `firecrawl`, `crw`, `google-pse`, `youcom`, `serply`, `parallel`（仅服务端模式） |
+| 联网搜索服务商 | `tavily`, `firecrawl`, `context`, `crw`, `google-pse`, `youcom`, `serply`, `parallel`（仅服务端模式） |
 
 说明：
 
@@ -149,6 +149,7 @@ docker run -p 3000:3000 --name deep-research-web -d deep-research-web
 - 上游错误文本会完整记录在服务端日志中，但返回浏览器前只保留状态码，因此即使服务商在错误信息里回显密钥也不会泄漏给客户端。
 - `NUXT_WEB_SEARCH_API_KEY` 支持为 Tavily、Google PSE 和 Serply 配置逗号分隔的多个密钥，例如 `key1,key2,key3`。
 - Google PSE 需要同时配置 `NUXT_WEB_SEARCH_API_KEY` 和 `NUXT_PUBLIC_GOOGLE_PSE_ID`。
+- Context.dev（`context`）使用 `NUXT_WEB_SEARCH_API_KEY` 获取与查询相关的 Highlights 并按需读取页面。调用消耗 Context 积分；新闻意图和明确日期区间会提示不支持，不完整响应不会作为完整证据。
 - Firecrawl 自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - fastCRW（`crw`）是与 Firecrawl 兼容的网页抓取工具（单一二进制文件；可自托管或使用云服务）。默认使用云端地址 `https://fastcrw.com/api`，密钥从 `NUXT_WEB_SEARCH_API_KEY` 读取（文档中记为 `CRW_API_KEY`）；自部署可以通过 `NUXT_WEB_SEARCH_API_BASE` 配置接口地址。
 - You.com（`youcom`）从 `NUXT_WEB_SEARCH_API_KEY` 读取密钥（可选，支持逗号分隔多密钥轮询）。未设置密钥时使用免密钥端点（每日配额有限）；可在 https://you.com/platform/api-keys 获取密钥。
@@ -186,8 +187,8 @@ NUXT_NO_PROXY=localhost,127.0.0.1,::1
 ```
 
 - 支持 `http`、`https`、`socks5`、`socks5h`、`socks`。
-- `http(s)` 代理全覆盖：AI 服务商、Google PSE、you.com、Serply、Parallel，以及 Tavily / Firecrawl / CRW SDK。
-- `socks*` 代理只覆盖 AI 服务商、Google PSE、you.com、Serply 和 Parallel；Tavily / Firecrawl / CRW SDK（基于 axios）不支持 SOCKS，会直连。多数代理商同一网关的 `http://` 地址可用相同凭证，要全覆盖请用 `http://`。
+- `http(s)` 代理全覆盖：AI 服务商、Google PSE、you.com、Context.dev、Serply、Parallel，以及 Tavily / Firecrawl / CRW SDK。
+- `socks*` 代理只覆盖 AI 服务商、Google PSE、you.com、Context.dev、Serply 和 Parallel；Tavily / Firecrawl / CRW SDK（基于 axios）不支持 SOCKS，会直连。多数代理商同一网关的 `http://` 地址可用相同凭证，要全覆盖请用 `http://`。
 - `NUXT_NO_PROXY` 支持 `*`、精确主机和父域名（`example.com` 同时匹配 `api.example.com`）。本地 AI 网关（Ollama、LiteLLM）和自托管抓取服务靠默认值保持直连。
 - 未设置 `NUXT_PROXY_URL` 时，兼容标准的 `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` 环境变量。
 - 日志中的代理密码会自动脱敏。
