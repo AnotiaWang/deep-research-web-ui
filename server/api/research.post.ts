@@ -150,7 +150,7 @@ export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFu
       fetch: proxyFetch,
     }
 
-    if (provider === 'firecrawl' || provider === 'crw') {
+    if (provider === 'firecrawl' || provider === 'context' || provider === 'crw') {
       return searchWeb({ ...sharedConfig, apiKey: runtimeConfig.webSearchApiKey }, query, options)
     }
     if (provider === 'google-pse' && !runtimeConfig.public.googlePseId) {
@@ -172,11 +172,12 @@ export function createServerWebSearch(runtimeConfig: RuntimeConfig): WebSearchFu
   }
 
   let readSource: WebSearchFunction['readSource']
-  if (provider === 'firecrawl') {
+  if (provider === 'firecrawl' || provider === 'context') {
     readSource = createReadSource({
       provider,
       apiKey: runtimeConfig.webSearchApiKey,
       apiBase: runtimeConfig.webSearchApiBase,
+      fetch: proxyFetch,
     })
   } else if (provider === 'tavily') {
     readSource = (url, options) =>

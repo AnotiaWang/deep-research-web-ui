@@ -106,6 +106,14 @@
       supportsCustomApiBase: true,
     },
     {
+      label: 'Context.dev',
+      value: 'context',
+      help: 'settings.webSearch.providers.context.help',
+      // Only kept for easy reference in i18n Ally
+      _help: t('settings.webSearch.providers.context.help'),
+      link: 'https://context.dev',
+    },
+    {
       label: 'fastCRW',
       value: 'crw',
       help: 'settings.webSearch.providers.crw.help',
